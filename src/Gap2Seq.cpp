@@ -1,6 +1,6 @@
 /*****************************************************************************
  *  Gap2Seq
- *  Copyright (C) Leena Salmela, Kristoffer Sahlin, Veli Mäkinen,
+ *  Copyright (C) Leena Salmela, Kristoffer Sahlin, Veli Mï¿½kinen,
  *  Alexandru Tomescu 2015
  *
  *  Contact: leena.salmela@cs.helsinki.fi
@@ -26,7 +26,7 @@
 #include <unordered_set>
 
 #include <boost/graph/adjacency_list.hpp>
-#include <boost/graph/graphviz.hpp>
+// #include <boost/graph/graphviz.hpp>
 #include <boost/graph/strong_components.hpp>
 #include <boost/graph/topological_sort.hpp>
 
@@ -46,11 +46,11 @@ using namespace std;
 
 
 // Check if a file is readable
-bool is_readable( const std::string & file ) 
-{ 
-    std::ifstream f( file.c_str() ); 
-    return !f.fail(); 
-} 
+bool is_readable( const std::string & file )
+{
+    std::ifstream f( file.c_str() );
+    return !f.fail();
+}
 
 
 /********************************************************************************/
@@ -87,7 +87,7 @@ Gap2Seq::Gap2Seq ()  : Tool ("Gap2Seq")
 
 #ifndef SINGLE_THREAD
 // Synchronizer for access to global variables
-ISynchronizer *lock;
+ISynchronizer *global_lock;
 #endif
 
 /*********************************************************************
@@ -129,39 +129,24 @@ void Gap2Seq::execute ()
     graph = Graph::load(reads);
   } else {
     // Tokenize reads file (list of files separated by ,)
-    int filecount=1;
-    char *readcstr = (char *)reads.c_str();
-    for(int i = 0; i < strlen(readcstr); i++) {
-      if (readcstr[i] == ',')
-	filecount++;
+    std::vector<std::string> files;
+    std::stringstream ss(reads.c_str());
+    std::string file;
+    while (std::getline(ss, file, ',')) {
+      /*if (!is_readable(file)) {
+        std::cerr << "Cannot access: " << file << std::endl;
+        exit(EXIT_FAILURE);
+      }*/
+
+      files.push_back(file);
     }
-    
-    if (filecount > 1) {
-      char **files = new char*[filecount];
-      files[0] = readcstr;
-      int j = 1;
-      int l = strlen(readcstr);
-      for (int i = 0; i < l; i++) {
-	if (readcstr[i] == ','){
-	  readcstr[i] = '\0';
-	  files[j] = &readcstr[i+1];
-	  j++;
-	}
-      }
-      try {
-	BankFasta *b = new BankFasta(filecount, files);
-	graph = Graph::create(b, (char const *)"-kmer-size %d -abundance %d -bloom cache -debloom original", k, solid);
-      } catch (Exception& e) {
-	std::cout << "DBG building failed: " << e.getMessage() << std::endl;
-	exit(EXIT_FAILURE);
-      }
-    } else {
-      try {
-	graph = Graph::create ((char const *)"-in %s -kmer-size %d -abundance %d -bloom cache -debloom original", reads.c_str(), k, solid);
-      } catch (Exception& e) {
-	std::cout << "DBG building failed: " << e.getMessage() << std::endl;
-	exit(EXIT_FAILURE);
-      }
+
+    try {
+      BankAlbum *b = new BankAlbum(files);
+      graph = Graph::create(b, (char const *)"-kmer-size %d -abundance-min %d -debloom original -debloom-impl basic", k, solid);
+    } catch (Exception& e) {
+      std::cout << "DBG building failed: " << e.getMessage() << std::endl;
+      exit(EXIT_FAILURE);
     }
   }
   std::cout << graph.getInfo() << std::endl;
@@ -181,7 +166,7 @@ void Gap2Seq::execute ()
 
 #ifndef SINGLE_THREAD
   // Synchronization for output (both file and stdout)
-  lock = System::thread().newSynchronizer();
+  global_lock = System::thread().newSynchronizer();
   IDispatcher *d = getDispatcher();
   // Default group size is too big (one thread will do all the work...)
   d->setGroupSize(1);
@@ -198,7 +183,7 @@ void Gap2Seq::execute ()
     std::string seq = itSeq->toString();
     std::string comment = itSeq->getComment();
 #else
-  // IDispatcher::Status status = d->iterate(&itSeq, [&] (const Sequence& sequence) {    
+  // IDispatcher::Status status = d->iterate(&itSeq, [&] (const Sequence& sequence) {
   Range<int>::Iterator intIt(1,d->getExecutionUnitsNumber());
   itSeq.first();
   IDispatcher::Status status = d->iterate(intIt, [&] (int id) {
@@ -208,7 +193,7 @@ void Gap2Seq::execute ()
     std::string seq = "";
     std::string comment = "";
     {
-      LocalSynchronizer local(lock);
+      LocalSynchronizer local(global_lock);
       if (!itSeq.isDone()) {
 	seq = itSeq->toString();
 	comment = itSeq->getComment();
@@ -221,7 +206,7 @@ void Gap2Seq::execute ()
     if (!more)
       break;
 #endif
-      
+
     //    std::string seq = sequence.toString();
 
 
@@ -237,7 +222,7 @@ void Gap2Seq::execute ()
 //     std::cout << comment << std::endl;
 // #else
 //     {
-//       LocalSynchronizer local(lock);
+//       LocalSynchronizer local(global_lock);
 //       std::cout << comment << std::endl;
 
 // #ifdef DEBUG
@@ -252,7 +237,7 @@ void Gap2Seq::execute ()
       if (seq[i] == 'N' || seq[i] == 'n') {
 #ifndef SINGLE_THREAD
 	{
-	  LocalSynchronizer local(lock);
+	  LocalSynchronizer local(global_lock);
 #endif
 	  gapcount++;
 #ifndef SINGLE_THREAD
@@ -285,13 +270,13 @@ void Gap2Seq::execute ()
 	  int left_fuz=0, right_fuz=0;
 	  // Struct for subgraph statistics
 	  struct subgraph_stats substats;
- 
+
 	  s = 0;
 	  s = fill_gap(graph, seq.substr(kmer_start,k+fuz), seq.substr(i,k+fuz), gap+k, d_err, fuz, k, max_mem, &left_fuz, &right_fuz, buf, skip_confident, &substats);
 
 #ifndef SINGLE_THREAD
 	  {
-	    LocalSynchronizer local(lock);
+	    LocalSynchronizer local(global_lock);
 #endif
 
 	    if (s > 0 && (!unique_paths || s == 1)) {
@@ -307,29 +292,29 @@ void Gap2Seq::execute ()
 		}
 		int filledStart = filledSeq.length() + kmer_start+k+fuz-left_fuz-prevGapEnd;
 		int filledLen = (int)strlen(&buf[fuz-left_fuz])-k;
-		std::cout << "Scaffold: " << comment << " GapStart: " << kmer_start+k+fuz << " GapEnd: " << i << 
-		  " GapLength: " << gap << " PathsFound: " << s << " FilledStart: " << filledStart << 
-		  " FilledEnd: " << filledStart + filledLen << " FilledGapLength: " <<  filledLen << 
+		std::cout << "Scaffold: " << comment << " GapStart: " << kmer_start+k+fuz << " GapEnd: " << i <<
+		  " GapLength: " << gap << " PathsFound: " << s << " FilledStart: " << filledStart <<
+		  " FilledEnd: " << filledStart + filledLen << " FilledGapLength: " <<  filledLen <<
 		  " LeftFuz: " << left_fuz << " RightFuz: " << right_fuz << " ConfidentBases: " << upper << " TotalBases: " << (upper+lower) << std::endl;
 		std::cout << "SubgraphStats: Vertices: " << substats.vertices << " Edges: " << substats.edges << " NontrivialStrongComponents: " << substats.nontrivial_components << " SizeNontrivialStrongComponents: " << substats.size_nontrivial_components << " VerticesFinal: " << substats.vertices_final << " EdgesFinal: " << substats.edges_final << std::endl;
-#
+
 	      } else {
 		int filledStart = filledSeq.length() + kmer_start+k+fuz-left_fuz-prevGapEnd;
 		int filledLen = (int)strlen(&buf[fuz-left_fuz])-k;
-		std::cout << "Scaffold: " << comment << " GapStart: " << kmer_start+k+fuz << " GapEnd: " << i << 
-		  " GapLength: " << gap << " PathsFound: " << s << " FilledStart: " << filledStart << 
-		  " FilledEnd: " << filledStart + filledLen << " FilledGapLength: " <<  filledLen << 
+		std::cout << "Scaffold: " << comment << " GapStart: " << kmer_start+k+fuz << " GapEnd: " << i <<
+		  " GapLength: " << gap << " PathsFound: " << s << " FilledStart: " << filledStart <<
+		  " FilledEnd: " << filledStart + filledLen << " FilledGapLength: " <<  filledLen <<
 		  " LeftFuz: " << left_fuz << " RightFuz: " << right_fuz << std::endl;
 
 	      }
 	    } else {
 	      if (s == -1) {
 		std::cout << "Scaffold: " << comment << " GapStart: " << kmer_start+k+fuz << " GapEnd: " << i <<
-		  " GapLength: " << gap << " PathsFound: 0 FilledStart: 0 FilledEnd: 0 FilledGapLength: 0 LeftFuz: " << left_fuz << 
+		  " GapLength: " << gap << " PathsFound: 0 FilledStart: 0 FilledEnd: 0 FilledGapLength: 0 LeftFuz: " << left_fuz <<
 		  " RightFuz: " << right_fuz << " Memory limit exceeded" << std::endl;
 	      } else {
 		std::cout << "Scaffold: " << comment << " GapStart: " << kmer_start+k+fuz << " GapEnd: " << i <<
-		  " GapLength: " << gap << " PathsFound: " << s << " FilledStart: 0 FilledEnd: 0 FilledGapLength: 0 LeftFuz: " << left_fuz << 
+		  " GapLength: " << gap << " PathsFound: " << s << " FilledStart: 0 FilledEnd: 0 FilledGapLength: 0 LeftFuz: " << left_fuz <<
 		  " RightFuz: " << right_fuz << std::endl;
 	      }
 	    }
@@ -374,7 +359,7 @@ void Gap2Seq::execute ()
     s._comment = comment;
 #ifndef SINGLE_THREAD
     {
-      LocalSynchronizer local(lock);
+      LocalSynchronizer local(global_lock);
 #endif
       output.insert(s);
       output.flush();
@@ -422,7 +407,7 @@ public:
     long long id = System::thread().getThreadSelf();
 #ifndef SINGLE_THREAD
     {
-      LocalSynchronizer local(lock);
+      LocalSynchronizer local(global_lock);
 #endif
       memuse[id] += n*sizeof(T);
 #ifndef SINGLE_THREAD
@@ -438,7 +423,7 @@ public:
     long long id = System::thread().getThreadSelf();
 #ifndef SINGLE_THREAD
     {
-      LocalSynchronizer local(lock);
+      LocalSynchronizer local(global_lock);
 #endif
       memuse[id] -= n*sizeof(T);
 #ifndef SINGLE_THREAD
@@ -447,13 +432,13 @@ public:
     return std::allocator<T>::deallocate(p, n);
   }
 
-  count_allocator() throw(): std::allocator<T>() { 
+  count_allocator() throw(): std::allocator<T>() {
 #ifdef DEBUG
-    fprintf(stderr, "Hello allocator!\n"); 
+    fprintf(stderr, "Hello allocator!\n");
 #endif
   }
   count_allocator(const count_allocator &a) throw(): std::allocator<T>(a) { }
-  template <typename U>                    
+  template <typename U>
   count_allocator(const count_allocator<U> &a) throw(): std::allocator<T>(a) { }
   ~count_allocator() throw() { }
 };
@@ -598,7 +583,7 @@ public:
 #ifdef STATS
       nonzeros++;
 #endif
-    }    
+    }
   }
 
   // Supports only updating the last value and adding a new value
@@ -623,21 +608,21 @@ public:
 #ifdef STATS
       nonzeros++;
 #endif
-    }    
+    }
   }
 
   vector<pair<int, int>, count_allocator<pair<int, int> > >::reverse_iterator getf_rbegin() {
     return s_f.rbegin();
-  }  
+  }
   vector<pair<int, int>, count_allocator<pair<int, int> > >::reverse_iterator getf_rend() {
     return s_f.rend();
-  }  
+  }
   vector<pair<int, int>, count_allocator<pair<int, int> > >::reverse_iterator getr_rbegin() {
     return s_r.rbegin();
-  }  
+  }
   vector<pair<int, int>, count_allocator<pair<int, int> > >::reverse_iterator getr_rend() {
     return s_r.rend();
-  }  
+  }
 
 
 
@@ -813,21 +798,21 @@ public:
 #ifdef STATS
       nonzeros++;
 #endif
-    }    
+    }
   }
 
   vector<int, count_allocator<int> >::reverse_iterator getf_rbegin() {
     return s_f.rbegin();
-  }  
+  }
   vector<int, count_allocator<int> >::reverse_iterator getf_rend() {
     return s_f.rend();
-  }  
+  }
   vector<int, count_allocator<int> >::reverse_iterator getr_rbegin() {
     return s_r.rbegin();
-  }  
+  }
   vector<int, count_allocator<int> >::reverse_iterator getr_rend() {
     return s_r.rend();
-  }  
+  }
 
 
 
@@ -853,11 +838,11 @@ struct node_hash {
 // gap_err: upper bound on the error in gap length
 // fuz: maximum number of gap bordering nucleotides that can be ignored
 // k: k-mer size
-// The following should be non-null if a (ad hoc random) filling sequence should be recovered by traceback. 
+// The following should be non-null if a (ad hoc random) filling sequence should be recovered by traceback.
 // Otherwise they should all be NULL.
 // left_fuz: The number of actual ignored nucleotides on the left end of the gap
 // right_fuz: The number of actual ignored nucleotides on the right end of the gap
-// fill: The sequence to fill the gap. Start offset of actual sequence in fill is fuz - left_fuz, 
+// fill: The sequence to fill the gap. Start offset of actual sequence in fill is fuz - left_fuz,
 //       the fill seq always includes the right kmer
 int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right, int gap_len, int gap_err, int fuz, int k, long long max_mem, int *left_fuz, int *right_fuz, char *fill, bool skip_confident, struct subgraph_stats *substats) {
 
@@ -872,7 +857,7 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
   long long id = System::thread().getThreadSelf();
 #ifndef SINGLE_THREAD
   {
-      LocalSynchronizer local(lock);
+      LocalSynchronizer local(global_lock);
 #endif
       memuse[id] = 0;
 #ifndef SINGLE_THREAD
@@ -910,12 +895,12 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
     if (reachableSetRight.find(node) != reachableSetRight.end()) {
       me = reachableSetRight[node];
     }
-      
+
     if (me == NULL) {
       me = new map_element2(gap_len/2+gap_err/2+fuz);
       reachableSetRight[node] = me;
     }
-    
+
     // Initialize the dp row
     if (node.strand == STRAND_FORWARD) {
       me->setf(currentD);
@@ -927,7 +912,7 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
   long long mymemuse;
 #ifndef SINGLE_THREAD
   {
-      LocalSynchronizer local(lock);
+      LocalSynchronizer local(global_lock);
 #endif
       mymemuse = memuse[id];
 #ifndef SINGLE_THREAD
@@ -951,7 +936,7 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
     for (std::unordered_set<Node, node_hash, equal_to<Node>, count_allocator<Node> >::iterator it = border.begin(); it != border.end(); ++ it) {
 #ifndef SINGLE_THREAD
       {
-	LocalSynchronizer local(lock);
+	LocalSynchronizer local(global_lock);
 #endif
 	mymemuse = memuse[id];
 #ifndef SINGLE_THREAD
@@ -962,11 +947,11 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
 	break;
 
       Node n = (Node) *it;
-      
+
 #ifdef DEBUG
       std::cout << graph.toString(n) << (n.strand == STRAND_FORWARD ? " F": " R") <<  std::endl;
 #endif
-      
+
       // Get the neightbors of the node and update their dp rows
       Graph::Vector<Node> neighbors = graph.predecessors<Node>(n);
       map_element2 *node_me = reachableSetRight[n];
@@ -1043,13 +1028,13 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
 
 #ifndef SINGLE_THREAD
     {
-      LocalSynchronizer local(lock);
+      LocalSynchronizer local(global_lock);
 #endif
       mymemuse = memuse[id];
 #ifndef SINGLE_THREAD
     }
 #endif
-  }  
+  }
 
   // Search from the left
   border.clear();
@@ -1086,12 +1071,12 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
     if (reachableSetLeft.find(node) != reachableSetLeft.end()) {
       me = reachableSetLeft[node];
     }
-      
+
     if (me == NULL) {
       me = new map_element(gap_len+gap_err+2*fuz);
       reachableSetLeft[node] = me;
     }
-    
+
     // Initialize the dp row
     if (node.strand == STRAND_FORWARD) {
       me->setf(currentD, 1);
@@ -1104,7 +1089,7 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
 
 #ifndef SINGLE_THREAD
   {
-      LocalSynchronizer local(lock);
+      LocalSynchronizer local(global_lock);
 #endif
       mymemuse = memuse[id];
 #ifndef SINGLE_THREAD
@@ -1126,7 +1111,7 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
     for (std::unordered_set<Node, node_hash, equal_to<Node>, count_allocator<Node> >::iterator it = border.begin(); it != border.end(); ++ it) {
 #ifndef SINGLE_THREAD
       {
-	LocalSynchronizer local(lock);
+	LocalSynchronizer local(global_lock);
 #endif
 	mymemuse = memuse[id];
 #ifndef SINGLE_THREAD
@@ -1141,7 +1126,7 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
 #ifdef DEBUG
       std::cout << graph.toString(n) << (n.strand == STRAND_FORWARD ? " F": " R") <<  std::endl;
 #endif
-      
+
       // Get the neighbors of the node and update their dp rows
       Graph::Vector<Node> neighbors = graph.successors<Node>(n);
       map_element *node_me = reachableSetLeft[n];
@@ -1174,10 +1159,10 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
 	}
       }
     }
-    
+
 #ifndef SINGLE_THREAD
     {
-      LocalSynchronizer local(lock);
+      LocalSynchronizer local(global_lock);
 #endif
       mymemuse = memuse[id];
 #ifndef SINGLE_THREAD
@@ -1279,7 +1264,7 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
 	      pathLengths.push_back(actual_gap_len1);
 	    }
 	  }
-	
+
 	  if (actual_gap_len2 != actual_gap_len1 && actual_gap_len2 >= 0) {
 	    if (rnode.strand == STRAND_FORWARD) {
 	      if (right->getf(actual_gap_len2) >= 1) {
@@ -1311,7 +1296,7 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
 	  typedef boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirectionalS > digraph;
 	  typedef boost::graph_traits<digraph>::vertex_descriptor bnode ;
 	  digraph subgraph(0);
-	  std::unordered_map<Node, bnode, node_hash, equal_to<Node>, count_allocator< pair <const Node, map_element *> > > node2boost;
+	  std::unordered_map<Node, bnode, node_hash, equal_to<Node>, count_allocator< pair <const Node, bnode> > > node2boost;
 	  int *branch = NULL;
 
 	  if (!skip_confident) {
@@ -1375,7 +1360,7 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
 		    }
 		  }
 		}
-	      
+
 		backBorder.clear();
 		backBorder.swap(nextBackBorder);
 		currentD2--;
@@ -1488,7 +1473,7 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
 	    write_graphviz(std::cout, subgraph, boost::make_label_writer(branch));
 #endif
 	  }
-	
+
 	  // Recover the fill sequence
 
 	  // Choose by random the length of the path to follow
@@ -1496,12 +1481,12 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
 	  int lastSolid = currentD2;
 
 	  // Trace back in the dp matrix
-	  
+
 	  current = rnode;
 	  // Set of in neighbors of the current node
 	  std::vector<Node> back;
 	  fill[currentD2] = '\0';
-	  
+
 	  while(currentD2 >= 0) {
 	    // The current k-mer
 	    string str = graph.toString(current);
@@ -1509,7 +1494,7 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
 #ifdef DEBUG
 	    std::cout << str << std::endl;
 #endif
-	  
+
 	    // Check for end condition
 	    if (currentD2 <= fuz) {
 	      Node lnode = graph.buildNode(Data((char *)kmer_left.substr(currentD2,k).c_str()));
@@ -1580,7 +1565,7 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
 
 #ifndef SINGLE_THREAD
     {
-      LocalSynchronizer local(lock);
+      LocalSynchronizer local(global_lock);
 #endif
       mymemuse = memuse[id];
 #ifndef SINGLE_THREAD
@@ -1640,9 +1625,9 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
 #ifdef STATS
 #ifndef SINGLE_THREAD
   {
-      LocalSynchronizer local(lock);
+      LocalSynchronizer local(global_lock);
 #endif
-      std::cout << "Nodes: " << n << " Nonzeros: " << nz << " Total memory: " << memuse[id] << std::endl; 
+      std::cout << "Nodes: " << n << " Nonzeros: " << nz << " Total memory: " << memuse[id] << std::endl;
 #ifndef SINGLE_THREAD
   }
 #endif
