@@ -1,6 +1,6 @@
 /*****************************************************************************
  *  Gap2Seq
- *  Copyright (C) Leena Salmela, Kristoffer Sahlin, Veli Mäkinen,
+ *  Copyright (C) Leena Salmela, Kristoffer Sahlin, Veli MÃ¤kinen,
  *  Alexandru Tomescu 2014
  *
  *  Contact: leena.salmela@cs.helsinki.fi
@@ -22,9 +22,24 @@
 #ifndef _TOOL_Gap2Seq_HPP_
 #define _TOOL_Gap2Seq_HPP_
 
-/********************************************************************************/
+#include <vector>
+#include <string>
+
+#include <boost/graph/adjacency_list.hpp>
+#include <boost/graph/strong_components.hpp>
+#include <boost/graph/topological_sort.hpp>
+
 #include <gatb/gatb_core.hpp>
-/********************************************************************************/
+
+typedef boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirectionalS > digraph;
+typedef boost::graph_traits<digraph>::vertex_descriptor bnode;
+typedef std::vector<bnode> container;
+
+// Check if a file is readable
+inline bool is_readable(const std::string & file) {
+    std::ifstream f( file.c_str() );
+    return !f.fail();
+}
 
 // Subgraph statistics
 struct subgraph_stats {
@@ -35,7 +50,6 @@ struct subgraph_stats {
   int vertices_final;
   int edges_final;
 };
-
 
 class Gap2Seq : public Tool
 {
@@ -58,4 +72,3 @@ public:
 /********************************************************************************/
 
 #endif /* _TOOL_Gap2Seq_HPP_ */
-

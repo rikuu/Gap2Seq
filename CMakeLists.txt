@@ -72,7 +72,7 @@ target_link_libraries ("GapCutter"  ${gatb-core-libraries})
 target_link_libraries ("GapMerger"  ${gatb-core-libraries})
 
 # we add a compiler flag
-SET(GCC_COMPILE_MAP_FLAGS "-std=c++0x -g -Wall")
+SET(GCC_COMPILE_MAP_FLAGS "-std=c++0x -g -Wall -pedantic -Weverything")
 SET(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${GCC_COMPILE_MAP_FLAGS}")
 
 # we add the main executable script
