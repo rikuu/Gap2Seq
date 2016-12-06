@@ -70,7 +70,7 @@ static const char* STR_LENGTH = "-length";
 /*********************************************************************
 Constructor for the tool.
 *********************************************************************/
-Gap2Seq::Gap2Seq ()  : Tool ("Gap2Seq")
+Gap2Seq::Gap2Seq() : Tool("Gap2Seq")
 {
     // We add some custom arguments for command line interface
     getParser()->push_front (new OptionOneParam (STR_KMER_LEN, "kmer length",  false, DEFAULT_K));
@@ -90,10 +90,13 @@ Gap2Seq::Gap2Seq ()  : Tool ("Gap2Seq")
     getParser()->push_front (new OptionOneParam (STR_LENGTH, "Length of a single gap", false, ""));
 }
 
-#ifndef SINGLE_THREAD
 // Synchronizer for access to global variables
+#ifndef SINGLE_THREAD
 ISynchronizer *global_lock;
 #endif
+
+// Array of memory usage accessed by thread id
+std::unordered_map<long long, long long> memuse;
 
 // Print statistics for gap filling
 void print_statistics(int filledStart, int gapStart, int gapEnd, int paths, char *buf, int fuz, int k, int left_fuz, int right_fuz, bool skip_confident, bool unique_paths, subgraph_stats substats, int gap, std::string comment) {
@@ -302,7 +305,7 @@ void Gap2Seq::execute ()
     int prevGapEnd = 0;
 
     // Index over sequence positions
-    int i = 0;
+    size_t i = 0;
 
     // Iterate over the sequence and find gaps
     while (i < seq.size()) {
@@ -415,11 +418,6 @@ void Gap2Seq::execute ()
   std::cout << "Filled " << filledgapcount << " gaps out of " << gapcount << std::endl;
 }
 
-// Threadwise memory limit using std allocators
-
-// Array of memory usage accessed by thread id
-std::unordered_map<long long, long long> memuse;
-
 // Custom memory allocator to be used with stl containers
 template <typename T>
 class count_allocator: public std::allocator<T> {
@@ -465,15 +463,18 @@ public:
     return std::allocator<T>::deallocate(p, n);
   }
 
-  count_allocator() throw(): std::allocator<T>() {
+  count_allocator() noexcept {
 #ifdef DEBUG
     fprintf(stderr, "Hello allocator!\n");
 #endif
   }
-  count_allocator(const count_allocator &a) throw(): std::allocator<T>(a) { }
+
+  count_allocator(const count_allocator &a) noexcept {}
+
   template <typename U>
-  count_allocator(const count_allocator<U> &a) throw(): std::allocator<T>(a) { }
-  ~count_allocator() throw() { }
+  count_allocator(const count_allocator<U> &a) noexcept {}
+
+  ~count_allocator() noexcept {}
 };
 
 
@@ -490,7 +491,7 @@ private:
 #endif
 
 public:
-  // Construct new dp row with dd+1 elements
+  // Construct new dp row
   map_element(int dd) {
 #ifdef STATS
     nonzeros=0;
@@ -680,7 +681,7 @@ private:
 #endif
 
 public:
-  // Construct new dp row with dd+1 elements
+  // Construct new dp row
   map_element2(int dd) {
 #ifdef STATS
     nonzeros=0;
@@ -991,7 +992,7 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
       // Number of paths to the parent node
       bool num_paths = n.strand == STRAND_FORWARD ? node_me->getf(currentD-1) : node_me->getr(currentD-1);
 
-      for (int i = 0; i < neighbors.size(); i++) {
+      for (size_t i = 0; i < neighbors.size(); i++) {
 	map_element2 *me = NULL;
 
 	if (reachableSetRight.find(neighbors[i]) != reachableSetRight.end()) {
@@ -1166,7 +1167,7 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
       // Number of paths to the parent node
       int num_paths = n.strand == STRAND_FORWARD ? node_me->getf(currentD-1) : node_me->getr(currentD-1);
 
-      for (int i = 0; i < neighbors.size(); i++) {
+      for (size_t i = 0; i < neighbors.size(); i++) {
 	if (currentD < gap_len/2+gap_err/2+fuz || reachableSetRight.find(neighbors[i]) != reachableSetRight.end()) {
 	  map_element *me = NULL;
 
@@ -1345,7 +1346,7 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
 	    std::cout << "PathLengthSize: " << pathLengths.size() << std::endl;
 #endif
 
-	    for(int j = 0; j < pathLengths.size(); j++) {
+	    for (size_t j = 0; j < pathLengths.size(); j++) {
 	      backBorder.clear();
 	      nextBackBorder.clear();
 	      backBorder.insert(rnode);
@@ -1362,7 +1363,7 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
 		  // Check for end condition
 		  if (currentD2 > fuz || current != lnode) {
 		    Graph::Vector<Node> neighbors = graph.predecessors(current);
-		    for (int i = 0; i < neighbors.size(); i++) {
+		    for (size_t i = 0; i < neighbors.size(); i++) {
 		      Node n = neighbors[i];
 		      if (reachableSetLeft.find(n) != reachableSetLeft.end()) {
 			if (n.strand == STRAND_FORWARD) {
@@ -1399,8 +1400,8 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
 	      }
 	    }
 
-	    vector<int> components(boost::num_vertices(subgraph));
-	    int num_components = strong_components(subgraph, make_iterator_property_map(components.begin(), get(boost::vertex_index, subgraph), components[0]));
+	    std::vector<size_t> components(boost::num_vertices(subgraph));
+	    size_t num_components = strong_components(subgraph, make_iterator_property_map(components.begin(), get(boost::vertex_index, subgraph), components[0]));
 
 #ifdef DEBUG
 	    std::cout << "Size of the path subgraph: " << boost::num_vertices(subgraph) << " / " <<  boost::num_edges(subgraph)  <<std::endl;
@@ -1409,28 +1410,29 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
 
 	    int csize[num_components];
 
-	    int num_real_vertices = boost::num_vertices(subgraph);
-	    int num_real_edges = boost::num_edges(subgraph);
-	    int num_nontrivial_components = 0;
-	    int size_nontrivial_components = 0;
+	    size_t num_real_vertices = boost::num_vertices(subgraph);
+	    size_t num_real_edges = boost::num_edges(subgraph);
+	    size_t num_nontrivial_components = 0;
+	    size_t size_nontrivial_components = 0;
+
 	    if (num_components != boost::num_vertices(subgraph)) {
 #ifdef DEBUG
 	      std::cout << "Subgraph contains cycles" << std::endl;
 #endif
-	      for(int i = 0; i < num_components; i++) {
+	      for (size_t i = 0; i < num_components; i++) {
 		csize[i] = 0;
 	      }
-	      for(int i = 0; i < boost::num_vertices(subgraph); i++) {
+	      for (size_t i = 0; i < boost::num_vertices(subgraph); i++) {
 		csize[components[i]]++;
 	      }
 	      bnode cnode[num_components];
-	      for(int i = 0; i < num_components; i++) {
+	      for(size_t i = 0; i < num_components; i++) {
 		if (csize[i] > 1) {
 		  cnode[i] = boost::add_vertex(subgraph);
 		  num_nontrivial_components++;
 		}
 	      }
-	      for(int i = 0; i < num_real_vertices; i++) {
+	      for (size_t i = 0; i < num_real_vertices; i++) {
 		if (csize[components[i]] > 1) {
 		  size_nontrivial_components++;
 		  boost::graph_traits<digraph>::in_edge_iterator e, end;
@@ -1459,13 +1461,13 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
 		}
 	      }
 
-	      for(int i = 0; i < num_real_vertices; i++) {
+	      for (size_t i = 0; i < num_real_vertices; i++) {
 		if (csize[components[i]] > 1) {
 		  boost::clear_vertex(i, subgraph);
 		}
 	      }
 	    } else {
-	      for(int i = 0; i < num_components; i++) {
+	      for (size_t i = 0; i < num_components; i++) {
 		csize[i] = 1;
 	      }
 	    }
@@ -1479,7 +1481,7 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
 
 	    // Count for parallel branches
 	    branch = new int[boost::num_vertices(subgraph)];
-	    for(int i = 0; i < boost::num_vertices(subgraph); i++) {
+	    for(size_t i = 0; i < boost::num_vertices(subgraph); i++) {
 	      branch[i] = 0;
 	    }
 
@@ -1549,7 +1551,7 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
 		fill[currentD2-1] = tolower(str[str.length()-1]);
 	      }
 	      Graph::Vector<Node> neighbors = graph.predecessors(current);
-	      for (int i = 0; i < neighbors.size(); i++) {
+	      for (size_t i = 0; i < neighbors.size(); i++) {
 		Node n = neighbors[i];
 		if (reachableSetLeft.find(n) != reachableSetLeft.end()) {
 		  if (n.strand == STRAND_FORWARD) {
@@ -1688,7 +1690,7 @@ std::set<Node> Gap2Seq::extract_reachable_nodes(Graph graph, std::string kmer, i
       Node n = (Node) *it;
       reachableSet.insert(n);
       Graph::Vector<Node> neighbors = graph.successors(n);
-      for (int i = 0; i < neighbors.size(); i++) {
+      for (size_t i = 0; i < neighbors.size(); i++) {
 	nextBorder.insert(neighbors[i]);
       }
     }

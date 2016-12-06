@@ -24,6 +24,7 @@
 
 #include <vector>
 #include <string>
+#include <unordered_map>
 
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/strong_components.hpp>
@@ -41,14 +42,22 @@ inline bool is_readable(const std::string & file) {
     return !f.fail();
 }
 
+#ifndef SINGLE_THREAD
+// Synchronizer for access to global variables
+extern ISynchronizer *global_lock;
+#endif
+
+// Array of memory usage accessed by thread id
+extern std::unordered_map<long long, long long> memuse;
+
 // Subgraph statistics
 struct subgraph_stats {
-  int vertices;
-  int edges;
-  int nontrivial_components;
-  int size_nontrivial_components;
-  int vertices_final;
-  int edges_final;
+  size_t vertices;
+  size_t edges;
+  size_t nontrivial_components;
+  size_t size_nontrivial_components;
+  size_t vertices_final;
+  size_t edges_final;
 };
 
 class Gap2Seq : public Tool
