@@ -40,6 +40,7 @@ static const char* STR_SCAFFOLDS = "-scaffolds";
 static const char* STR_CONTIGS = "-contigs";
 static const char* STR_GAPS = "-gaps";
 static const char* STR_FUZ = "-fuz";
+static const char* STR_BED = "-bed";
 
 /****************************************************************************/
 
@@ -76,6 +77,7 @@ GapCutter::GapCutter ()  : Tool ("GapCutter")
     getParser()->push_front (new OptionOneParam (STR_SCAFFOLDS, "FASTA/Q file of scaffolds",  true));
     getParser()->push_front (new OptionOneParam (STR_CONTIGS, "FASTA file of contigs",  true));
     getParser()->push_front (new OptionOneParam (STR_GAPS, "FASTA file of gaps",  true));
+    getParser()->push_front (new OptionOneParam( STR_BED, "BED file for gaps", true));
     getParser()->push_front (new OptionOneParam (STR_FUZ, "Number of nucleotides to ignore on gap fringes",  false, DEFAULT_FUZ));
     getParser()->push_front (new OptionOneParam (STR_KMER_LEN, "kmer length",  false, DEFAULT_K));
 }
@@ -121,12 +123,14 @@ void GapCutter::execute ()
   const std::string scaffoldsFilename = getInput()->getStr(STR_SCAFFOLDS);
   const std::string contigsFilename = getInput()->getStr(STR_CONTIGS);
   const std::string gapsFilename = getInput()->getStr(STR_GAPS);
+  const std::string bedFilename = getInput()->getStr(STR_BED);
   const int k = getInput()->getInt(STR_KMER_LEN);
   const int fuz = getInput()->getInt(STR_FUZ);
 
   std::cout << "Scaffolds file: " << scaffoldsFilename << std::endl;
   std::cout << "Contigs file: " << contigsFilename << std::endl;
   std::cout << "Gaps file: " << gapsFilename << std::endl;
+  std::cout << "BED file: " << bedFilename << std::endl;
   std::cout << "k-mer size: " << k << std::endl;
   std::cout << "Fuz: " << fuz << std::endl;
 
@@ -137,6 +141,10 @@ void GapCutter::execute ()
   // Open the output files
   BankFasta contigBank(contigsFilename);
   BankFasta gapBank(gapsFilename);
+
+  // Open output stream for BED file
+  ofstream bedFile;
+  bedFile.open(bedFilename);
 
   int contig = 0;
   int gap = 0;
@@ -195,6 +203,9 @@ void GapCutter::execute ()
         const std::string gapComment = comment + STR_GAP_MARKER + std::to_string(gap);
         insertSequence(gapBank, gapComment, seq.substr(startPosition, sequenceLength));
         insertSequence(contigBank, gapComment, seq.substr(previousGap, startPosition - previousGap));
+
+        // Write the gap information to BED file
+        bedFile << contigName << "\t" << startPosition << "\t" << startPosition + sequenceLength << std::endl;
 
         gap++;
         contig++;
