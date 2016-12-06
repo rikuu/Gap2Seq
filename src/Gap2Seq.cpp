@@ -19,7 +19,6 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 *****************************************************************************/
 
-#include <Gap2Seq.hpp>
 #include <map>
 #include <fstream>
 #include <unordered_map>
@@ -30,7 +29,7 @@
 #include <boost/graph/strong_components.hpp>
 #include <boost/graph/topological_sort.hpp>
 
-using namespace std;
+#include <Gap2Seq.hpp>
 
 //#define DEBUG
 
@@ -67,6 +66,11 @@ static const char* STR_MAX_MEM = "-max-mem";
 static const char* STR_SKIP_CONFIDENT = "-all-upper";
 static const char* STR_UNIQUE = "-unique";
 
+// For filling a single gap
+static const char* STR_LEFT = "-left";
+static const char* STR_RIGHT = "-right";
+static const char* STR_LENGTH = "-length";
+
 /*********************************************************************
 Constructor for the tool.
 *********************************************************************/
@@ -76,19 +80,74 @@ Gap2Seq::Gap2Seq ()  : Tool ("Gap2Seq")
     getParser()->push_front (new OptionOneParam (STR_KMER_LEN, "kmer length",  false, DEFAULT_K));
     getParser()->push_front (new OptionOneParam (STR_SOLID_THRESHOLD, "Threshold for solid k-mers",  false, DEFAULT_SOLID));
     getParser()->push_front (new OptionOneParam (STR_READS, "FASTA/Q files of reads. For several files use a comma separated list.",  true));
-    getParser()->push_front (new OptionOneParam (STR_SCAFFOLDS, "FASTA/Q file of scaffolds",  true));
-    getParser()->push_front (new OptionOneParam (STR_FILLED_SCAFFOLDS, "FASTA file of filled scaffolds",  true));
+    getParser()->push_front (new OptionOneParam (STR_SCAFFOLDS, "FASTA/Q file of scaffolds",  false, ""));
+    getParser()->push_front (new OptionOneParam (STR_FILLED_SCAFFOLDS, "FASTA file of filled scaffolds",  false, ""));
     getParser()->push_front (new OptionOneParam (STR_DIST_ERROR, "Maximum error in gap estimates",  false, DEFAULT_DIST_ERR));
     getParser()->push_front (new OptionOneParam (STR_FUZ, "Number of nucleotides to ignore on gap fringes",  false, DEFAULT_FUZ));
     getParser()->push_front (new OptionOneParam (STR_MAX_MEM, "Maximum memory usage of DP table computation in gigabytes (excluding DBG)",  false, DEFAULT_MAX_MEMORY));
     getParser()->push_front (new OptionNoParam (STR_SKIP_CONFIDENT, "If specified, all filled bases are in upper case.",  false, false));
     getParser()->push_front (new OptionNoParam (STR_UNIQUE, "If specified, only gaps with a unique path of best length are filled.",  false, false));
+
+    // TODO: Integrate all gap cutting and remove these
+    getParser()->push_front (new OptionOneParam (STR_LEFT, "Left flank of a single gap", false, ""));
+    getParser()->push_front (new OptionOneParam (STR_RIGHT, "Right flank of a single gap", false, ""));
+    getParser()->push_front (new OptionOneParam (STR_LENGTH, "Length of a single gap", false, ""));
 }
 
 #ifndef SINGLE_THREAD
 // Synchronizer for access to global variables
 ISynchronizer *global_lock;
 #endif
+
+// Print statistics for gap filling
+void print_statistics(int filledStart, int gapStart, int gapEnd, int paths, char *buf, int fuz, int k, int left_fuz, int right_fuz, bool skip_confident, bool unique_paths, subgraph_stats substats, int gap, std::string comment) {
+  #ifndef SINGLE_THREAD
+    {
+      LocalSynchronizer local(global_lock);
+  #endif
+
+      if (paths > 0 && (!unique_paths || paths == 1)) {
+        int filledLen = (int)strlen(&buf[fuz-left_fuz])-k;
+
+        int lower=0, upper=0;
+        if (!skip_confident) {
+          for (int j = 0; j < filledLen; j++) {
+            if (isupper(buf[j+fuz-left_fuz])) {
+              upper++;
+            } else {
+              lower++;
+            }
+          }
+
+          std::cout << "Scaffold: " << comment << " GapStart: " << gapStart << " GapEnd: " << gapEnd <<
+            " GapLength: " << gap << " PathsFound: " << paths << " FilledStart: " << filledStart <<
+            " FilledEnd: " << filledStart + filledLen << " FilledGapLength: " <<  filledLen <<
+            " LeftFuz: " << left_fuz << " RightFuz: " << right_fuz << " ConfidentBases: " << upper << " TotalBases: " << (upper+lower) << std::endl;
+          std::cout << "SubgraphStats: Vertices: " << substats.vertices << " Edges: " <<
+            substats.edges << " NontrivialStrongComponents: " << substats.nontrivial_components <<
+            " SizeNontrivialStrongComponents: " << substats.size_nontrivial_components << " VerticesFinal: " <<
+            substats.vertices_final << " EdgesFinal: " << substats.edges_final << std::endl;
+        } else {
+          std::cout << "Scaffold: " << comment << " GapStart: " << gapStart << " GapEnd: " << gapEnd <<
+            " GapLength: " << gap << " PathsFound: " << paths << " FilledStart: " << filledStart <<
+            " FilledEnd: " << filledStart + filledLen << " FilledGapLength: " <<  filledLen <<
+            " LeftFuz: " << left_fuz << " RightFuz: " << right_fuz << std::endl;
+        }
+      } else {
+        if (paths == -1) {
+          std::cout << "Scaffold: " << comment << " GapStart: " << gapStart << " GapEnd: " << gapEnd <<
+            " GapLength: " << gap << " PathsFound: 0 FilledStart: 0 FilledEnd: 0 FilledGapLength: 0 LeftFuz: " << left_fuz <<
+            " RightFuz: " << right_fuz << " Memory limit exceeded" << std::endl;
+        } else {
+          std::cout << "Scaffold: " << comment << " GapStart: " << gapStart << " GapEnd: " << gapEnd <<
+          " GapLength: " << gap << " PathsFound: " << paths << " FilledStart: 0 FilledEnd: 0 FilledGapLength: 0 LeftFuz: " << left_fuz <<
+          " RightFuz: " << right_fuz << std::endl;
+        }
+      }
+  #ifndef SINGLE_THREAD
+    }
+  #endif
+}
 
 /*********************************************************************
 Main method for gap filling
@@ -102,8 +161,6 @@ void Gap2Seq::execute ()
   int k = getInput()->getInt(STR_KMER_LEN);
   int solid = getInput()->getInt(STR_SOLID_THRESHOLD);
   std::string reads = getInput()->getStr(STR_READS);
-  std::string scaffolds = getInput()->getStr(STR_SCAFFOLDS);
-  std::string filled_scaffolds = getInput()->getStr(STR_FILLED_SCAFFOLDS);
   int d_err = getInput()->getInt(STR_DIST_ERROR);
   int fuz = getInput()->getInt(STR_FUZ);
   long long max_mem = (long long)(getInput()->getDouble(STR_MAX_MEM) * 1024*1024*1024);
@@ -114,8 +171,8 @@ void Gap2Seq::execute ()
   std::cout << "k-mer size: " << k << std::endl;
   std::cout << "Solidity threshold: " << solid << std::endl;
   std::cout << "Reads file: " << reads << std::endl;
-  std::cout << "Scaffolds file: " << scaffolds << std::endl;
-  std::cout << "Filled scaffolds file: " << filled_scaffolds << std::endl;
+  // std::cout << "Scaffolds file: " << scaffolds << std::endl;
+  // std::cout << "Filled scaffolds file: " << filled_scaffolds << std::endl;
   std::cout << "Distance error: " << d_err << std::endl;
   std::cout << "Fuz: " << fuz << std::endl;
   std::cout << "Max memory: " << max_mem << std::endl;
@@ -151,13 +208,46 @@ void Gap2Seq::execute ()
   }
   std::cout << graph.getInfo() << std::endl;
 
-  // Open the input scaffold file
-  BankFasta scaffoldBank(scaffolds);
+  if (getParser()->saw(STR_LEFT) && getParser()->saw(STR_RIGHT) && getParser()->saw(STR_LENGTH)) {
+    std::string kmer_left = getInput()->getStr(STR_LEFT);
+    std::string kmer_right = getInput()->getStr(STR_RIGHT);
+    int length = getInput()->getInt(STR_LENGTH);
 
-  // Iterate over scaffolds
+    // TODO: Use non-static flanks, i.e. flanks are >= k upto k+fuz
+    assert(kmer_left.length() == k+fuz);
+    assert(right_flank.length() == k+fuz);
+
+    // Buffer to hold the sequence to fill the gap
+    char *buf = new char[length+k+d_err+2*fuz+1+2];
+
+    // How many k-mers on the edge of the gap are ignored by the paths
+    int left_fuz = 0, right_fuz = 0;
+
+    // Struct for subgraph statistics
+    struct subgraph_stats substats;
+
+    // Number of paths found
+    int s = 0;
+    s = fill_gap(graph, kmer_left, kmer_right, length+k, d_err, fuz, k, max_mem, &left_fuz, &right_fuz, buf, skip_confident, &substats);
+    print_statistics(0, kmer_left.length(), kmer_left.length(), s, buf, fuz, k, left_fuz, right_fuz, skip_confident, unique_paths, substats, "", "");
+
+    // At least one path found
+	  if (s > 0 && (!unique_paths || s == 1)) {
+      // Remove ignored edges from flanks, insert filled sequence and output
+      // TODO: right flank is included?
+      std::cout << kmer_left.substr(0, k+fuz-left_fuz) << &buf[fuz-left_fuz] << std::endl;
+    }
+
+    return;
+  }
+
+  // Open the input scaffold file
+  std::string scaffolds = getInput()->getStr(STR_SCAFFOLDS);
+  BankFasta scaffoldBank(scaffolds);
   BankFasta::Iterator itSeq(scaffoldBank);
 
   // Open the output scaffold file
+  std::string filled_scaffolds = getInput()->getStr(STR_FILLED_SCAFFOLDS);
   BankFasta output(filled_scaffolds);
 
   // Count gaps and filled gaps
@@ -207,29 +297,15 @@ void Gap2Seq::execute ()
       break;
 #endif
 
-    //    std::string seq = sequence.toString();
-
-
     // Gap filled sequence
     std::string filledSeq = "";
+
     // Position where previous gap ended. The filled sequence is
     // complete up to this position (in the original sequence)
     int prevGapEnd = 0;
+
     // Index over sequence positions
-    int i=0;
-
-// #ifdef SINGLE_THREAD
-//     std::cout << comment << std::endl;
-// #else
-//     {
-//       LocalSynchronizer local(global_lock);
-//       std::cout << comment << std::endl;
-
-// #ifdef DEBUG
-//       std::cout << seq << std::endl;
-// #endif
-//     }
-// #endif
+    int i = 0;
 
     // Iterate over the sequence and find gaps
     while (i < seq.size()) {
@@ -254,91 +330,53 @@ void Gap2Seq::execute ()
 	}
 
 	// Check that the end k-mer is complete, i.e. no N's and enough sequence
-	int ok = i+k+fuz <= seq.size() ? 1 : 0;
-	for(int j = 0; j < k+fuz && ok; j++) {
+	bool ok = i+k+fuz <= seq.size() ? true : false;
+	for (int j = 0; j < k+fuz && ok; j++) {
 	  if (seq[i+j] == 'N' || seq[i+j] == 'n')
-	    ok = 0;
+	    ok = false;
 	}
 
 	// Check that the start k-mer is complete
 	if (kmer_start >= prevGapEnd && ok) {
-	  // Number of paths found
-	  int s;
-	  // Buffer to hold the sequence to fill the gap
-	  char *buf = new char[gap+k+d_err+2*fuz+1+2];
-	  // How many k-mers on the edge of the gap are ignored by the paths
-	  int left_fuz=0, right_fuz=0;
-	  // Struct for subgraph statistics
-	  struct subgraph_stats substats;
+    // Buffer to hold the sequence to fill the gap
+    char *buf = new char[gap+k+d_err+2*fuz+1+2];
 
-	  s = 0;
-	  s = fill_gap(graph, seq.substr(kmer_start,k+fuz), seq.substr(i,k+fuz), gap+k, d_err, fuz, k, max_mem, &left_fuz, &right_fuz, buf, skip_confident, &substats);
+    // How many k-mers on the edge of the gap are ignored by the paths
+    int left_fuz=0, right_fuz=0;
 
-#ifndef SINGLE_THREAD
-	  {
-	    LocalSynchronizer local(global_lock);
-#endif
+    // Struct for subgraph statistics
+    struct subgraph_stats substats;
 
-	    if (s > 0 && (!unique_paths || s == 1)) {
-	      filledgapcount++;
-	      int lower=0, upper=0;
-	      if (!skip_confident) {
-		for(int j = 0; j < (int)strlen(&buf[fuz-left_fuz])-k; j++) {
-		  if (isupper(buf[j+fuz-left_fuz])) {
-		    upper++;
-		  } else {
-		    lower++;
-		  }
-		}
-		int filledStart = filledSeq.length() + kmer_start+k+fuz-left_fuz-prevGapEnd;
-		int filledLen = (int)strlen(&buf[fuz-left_fuz])-k;
-		std::cout << "Scaffold: " << comment << " GapStart: " << kmer_start+k+fuz << " GapEnd: " << i <<
-		  " GapLength: " << gap << " PathsFound: " << s << " FilledStart: " << filledStart <<
-		  " FilledEnd: " << filledStart + filledLen << " FilledGapLength: " <<  filledLen <<
-		  " LeftFuz: " << left_fuz << " RightFuz: " << right_fuz << " ConfidentBases: " << upper << " TotalBases: " << (upper+lower) << std::endl;
-		std::cout << "SubgraphStats: Vertices: " << substats.vertices << " Edges: " << substats.edges << " NontrivialStrongComponents: " << substats.nontrivial_components << " SizeNontrivialStrongComponents: " << substats.size_nontrivial_components << " VerticesFinal: " << substats.vertices_final << " EdgesFinal: " << substats.edges_final << std::endl;
+    // Number of paths found
+    int s = 0;
+    s = fill_gap(graph, seq.substr(kmer_start,k+fuz), seq.substr(i,k+fuz), gap+k, d_err, fuz, k, max_mem, &left_fuz, &right_fuz, buf, skip_confident, &substats);
 
-	      } else {
-		int filledStart = filledSeq.length() + kmer_start+k+fuz-left_fuz-prevGapEnd;
-		int filledLen = (int)strlen(&buf[fuz-left_fuz])-k;
-		std::cout << "Scaffold: " << comment << " GapStart: " << kmer_start+k+fuz << " GapEnd: " << i <<
-		  " GapLength: " << gap << " PathsFound: " << s << " FilledStart: " << filledStart <<
-		  " FilledEnd: " << filledStart + filledLen << " FilledGapLength: " <<  filledLen <<
-		  " LeftFuz: " << left_fuz << " RightFuz: " << right_fuz << std::endl;
+    int filledStart = filledSeq.length() + kmer_start+k+fuz-left_fuz-prevGapEnd;
+    int gapStart = kmer_start+k+fuz;
+    print_statistics(filledStart, gapStart, i, s, buf, fuz, k, left_fuz, right_fuz, skip_confident, unique_paths, substats, gap, comment);
 
-	      }
-	    } else {
-	      if (s == -1) {
-		std::cout << "Scaffold: " << comment << " GapStart: " << kmer_start+k+fuz << " GapEnd: " << i <<
-		  " GapLength: " << gap << " PathsFound: 0 FilledStart: 0 FilledEnd: 0 FilledGapLength: 0 LeftFuz: " << left_fuz <<
-		  " RightFuz: " << right_fuz << " Memory limit exceeded" << std::endl;
-	      } else {
-		std::cout << "Scaffold: " << comment << " GapStart: " << kmer_start+k+fuz << " GapEnd: " << i <<
-		  " GapLength: " << gap << " PathsFound: " << s << " FilledStart: 0 FilledEnd: 0 FilledGapLength: 0 LeftFuz: " << left_fuz <<
-		  " RightFuz: " << right_fuz << std::endl;
-	      }
-	    }
-#ifndef SINGLE_THREAD
-	  }
-#endif
-	  if (s > 0 && (!unique_paths || s == 1)) {
-	    // At least one path was found
+    // At least one path was found
+    if (s > 0 && (!unique_paths || s == 1)) {
+      filledgapcount++;
 
-#ifdef DEBUG
-	    std::cout << "Fill: " << &buf[fuz-left_fuz] << std::endl;
-#endif
-	    // Add seq from end of previous gap to gap start and the gap fill sequence
-	    filledSeq = filledSeq + seq.substr(prevGapEnd, kmer_start+k+fuz-left_fuz-prevGapEnd)+(string)&buf[fuz-left_fuz];
-	    // Remove the right kmer
-	    filledSeq = filledSeq.substr(0,filledSeq.length()-k);
-	    // adjust gap end index
-	    i += right_fuz;
-	  } else {
-	    // No paths found, keep the gap
-	    // Add seq from end of previous gap to end of this gap
-	    filledSeq = filledSeq + seq.substr(prevGapEnd, kmer_start+k+fuz+gap-prevGapEnd);
-	  }
-	  delete [] buf;
+  #ifdef DEBUG
+      std::cout << "Fill: " << &buf[fuz-left_fuz] << std::endl;
+  #endif
+
+      // Add seq from end of previous gap to gap start and the gap fill sequence
+      filledSeq = seq.substr(prevGapEnd, kmer_start+k+fuz-left_fuz-prevGapEnd) + (string)&buf[fuz-left_fuz];
+
+      // Remove the right kmer
+      filledSeq = filledSeq.substr(0, filledSeq.length()-k);
+
+      // adjust gap end index
+      i += right_fuz;
+    } else {
+      // No paths found, keep the gap
+      // Add seq from end of previous gap to end of this gap
+      filledSeq = filledSeq + seq.substr(prevGapEnd, kmer_start+k+fuz+gap-prevGapEnd);
+    }
+    delete [] buf;
 	} else {
 	  // Either left or right k-mer is not complete
 	  // Add seq from end of previous gap to end of this gap
@@ -378,9 +416,7 @@ void Gap2Seq::execute ()
   output.flush();
 
   std::cout << "Filled " << filledgapcount << " gaps out of " << gapcount << std::endl;
-
 }
-
 
 // Threadwise memory limit using std allocators
 

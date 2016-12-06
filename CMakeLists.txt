@@ -54,7 +54,7 @@ add_definitions (${gatb-core-flags})
 #       - from project source
 #       - from GATB-CORE source
 #       - from dsk source
-include_directories (src  ${gatb-core-includes})
+include_directories (SYSTEM src  ${gatb-core-includes})
 
 # we define the files to be compiled
 file (GLOB  GAP2SEQ_SOURCES  src/Gap2Seq.cpp src/main.cpp)
@@ -72,7 +72,7 @@ target_link_libraries ("GapCutter"  ${gatb-core-libraries})
 target_link_libraries ("GapMerger"  ${gatb-core-libraries})
 
 # we add a compiler flag
-SET(GCC_COMPILE_MAP_FLAGS "-std=c++0x -g")
+SET(GCC_COMPILE_MAP_FLAGS "-std=c++0x -g -Wall")
 SET(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${GCC_COMPILE_MAP_FLAGS}")
 
 # we add the main executable script
