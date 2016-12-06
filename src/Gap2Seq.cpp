@@ -229,7 +229,7 @@ void Gap2Seq::execute ()
     // Number of paths found
     int s = 0;
     s = fill_gap(graph, kmer_left, kmer_right, length+k, d_err, fuz, k, max_mem, &left_fuz, &right_fuz, buf, skip_confident, &substats);
-    print_statistics(0, kmer_left.length(), kmer_left.length(), s, buf, fuz, k, left_fuz, right_fuz, skip_confident, unique_paths, substats, "", "");
+    print_statistics(0, kmer_left.length(), kmer_left.length(), s, buf, fuz, k, left_fuz, right_fuz, skip_confident, unique_paths, substats, 0, "");
 
     // At least one path found
 	  if (s > 0 && (!unique_paths || s == 1)) {
