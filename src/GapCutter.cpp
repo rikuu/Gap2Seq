@@ -233,16 +233,19 @@ void GapCutter::execute ()
         continue;
       }
 
-      // Case 2: Right flank overlaps with next left flank
+      // Case 2: Two gaps have overlapping flanks
       if (d2 >= k) {
         // TODO: Deal with this
         assert(d3 >= k);
 
         const size_t flank3 = std::min(d3, k+fuz);
 
+        // First gap gets entire middle section as right flank, second gap gets
+        // only k length right flank. Unfair and greedy, but makes merging them
+        // back easier.
         const std::string gapComment = comment + STR_GAP_MARKER + std::to_string(gap);
         insertSequence(gapBank, gapComment + STR_SPLIT_MARKER + "1", seq.substr(i + d1 - flank1, flank1 + l1 + d2));
-        insertSequence(gapBank, gapComment + STR_SPLIT_MARKER + "2", seq.substr(i + d1 + l1, d2 + l2 + flank3));
+        insertSequence(gapBank, gapComment + STR_SPLIT_MARKER + "2 " + std::to_string(k), seq.substr(i + d1 + l1 + d2 - k, k + l2 + flank3));
         insertSequence(contigBank, gapComment, seq.substr(i, d1 - flank1));
 
         bedFile << contigName << "\t" << i + d1 - flank1 << "\t" << i + d1 + l1 + d2 << std::endl;

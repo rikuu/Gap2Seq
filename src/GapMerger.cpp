@@ -36,9 +36,11 @@ static const char* STR_GAPS = "-gaps";
 
 static const char* STR_SCAFFOLD_MARKER = " scaffold ";
 static const char* STR_GAP_MARKER = " gap ";
+static const char* STR_SPLIT_MARKER = " split ";
 
 static const size_t SCAFFOLD_MARKER_LENGTH = 10u;
 static const size_t GAP_MARKER_LENGTH = 5u;
+static const size_t SPLIT_MARKER_LENGTH = 7u;
 
 /****************************************************************************/
 
@@ -72,14 +74,23 @@ GapMerger::GapMerger ()  : Tool ("GapMerger")
     getParser()->push_front (new OptionOneParam (STR_GAPS, "FASTA file of filled gaps",  true));
 }
 
+// TODO: Refactor these into a single function
 int GapMerger::parseGapIndex(const std::string &comment) const
 {
-  const size_t pos = comment.find(STR_GAP_MARKER);
-  if (pos == std::string::npos) {
+  const size_t gap_pos = comment.find(STR_GAP_MARKER);
+  if (gap_pos == std::string::npos) {
     return -1;
   }
 
-  const std::string index = comment.substr(pos + GAP_MARKER_LENGTH);
+  std::string index = "";
+  const size_t split_pos = comment.find(STR_SPLIT_MARKER);
+  if (split_pos == std::string::npos) {
+    index = comment.substr(gap_pos + GAP_MARKER_LENGTH);
+  } else {
+    index = comment.substr(gap_pos + GAP_MARKER_LENGTH,
+      split_pos - (gap_pos + GAP_MARKER_LENGTH));
+  }
+
   return std::stoi(index);
 }
 
@@ -89,7 +100,7 @@ int GapMerger::parseScaffoldIndex(const std::string &comment) const
   if (scaffold_pos == std::string::npos) {
     return -1;
   }
-  
+
   std::string index = "";
   const size_t gap_pos = comment.find(STR_GAP_MARKER);
   if (gap_pos == std::string::npos) {
@@ -146,7 +157,7 @@ void GapMerger::execute ()
 
     const int contigScaffoldIndex = parseScaffoldIndex(comment);
     const int gapIndex = parseGapIndex(comment);
-    
+
     // Scaffold done, write to file
     if (contigScaffoldIndex != scaffoldIndex) {
       if (scaffold.size() > 0) {
@@ -158,7 +169,7 @@ void GapMerger::execute ()
       scaffoldIndex = contigScaffoldIndex;
     }
 
-    // Remove markers from comment
+    // Remove markers from comment, i.e. remove anything after scaffold marker
     if (scaffoldComment.size() == 0) {
       const size_t marker_pos = comment.find(STR_SCAFFOLD_MARKER);
 
@@ -173,14 +184,38 @@ void GapMerger::execute ()
 
     if (gapIndex != -1) {
       // Find the gap corresponding to the contig and append to scaffold
+      std::string first = "", second = "";
       for (gapIter.first(); !gapIter.isDone(); gapIter.next()) {
         if (gapIndex == parseGapIndex(gapIter->getComment())) {
           gaps++;
 
-          scaffold += gapIter->toString();
-          break;
+          // Combine split gaps
+          // TODO: Refactor this
+          const size_t marker_pos = gapIter->getComment().find(STR_SPLIT_MARKER);
+          if (marker_pos == std::string::npos) {
+            first = gapIter->toString();
+            break;
+          } else {
+            const int split_num = std::stoi(gapIter->getComment().substr(marker_pos + SPLIT_MARKER_LENGTH, 1));
+            if (split_num == 1) {
+              first = gapIter->toString();
+            } else {
+              // Remove flank from second gap
+              // TODO: Fix case where flank is changed by ignored nucleotides
+              const int split_length = std::stoi(gapIter->getComment().substr(marker_pos + SPLIT_MARKER_LENGTH + 2));
+              second = gapIter->toString().substr(split_length);
+            }
+
+            std::cout << "first: " << first << " second: " << second << std::endl;
+
+            if (first != "" && second != "") {
+              break;
+            }
+          }
         }
       }
+
+      scaffold += first + second;
     }
   }
 
