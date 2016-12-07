@@ -183,9 +183,19 @@ void GapCutter::execute ()
       if (d1 < k) {
         if (d1 == 0) {
           i = seq.size();
+          continue;
         }
 
         i += d1 + l1;
+        continue;
+      }
+
+      // No gaps left, write contig
+      if (d1 > 0 && l1 == 0) {
+        insertSequence(contigBank, comment, seq.substr(i));
+        contig++;
+
+        i = seq.size();
         continue;
       }
 
@@ -225,7 +235,9 @@ void GapCutter::execute ()
 
       // Case 2: Right flank overlaps with next left flank
       if (d2 >= k) {
+        // TODO: Deal with this
         assert(d3 >= k);
+
         const size_t flank3 = std::min(d3, k+fuz);
 
         const std::string gapComment = comment + STR_GAP_MARKER + std::to_string(gap);
@@ -257,7 +269,15 @@ void GapCutter::execute ()
         dn = distanceToNextGap(seq, i + d1 + lsum);
       }
 
-      assert(dn >= k);
+      // Last sequence not long enough to be a flank
+      if (dn == 0) {
+        insertSequence(contigBank, comment, seq.substr(i));
+        contig++;
+
+        i = seq.size();
+        continue;
+      }
+
       const size_t flank2 = std::min(dn, k+fuz);
 
       // Mask everything between flanks as a gap
@@ -294,9 +314,7 @@ void GapCutter::execute ()
     scaffold++;
   }
 
-  std::cout << "Found " << allGaps << " gaps" << std::endl;
-
-  std::cout << "Cut out " << scaffold << " scaffolds into " <<
+  std::cout << "Cut " << scaffold << " scaffolds into " <<
     contig << " contigs and " << gap <<  " gaps" << std::endl;
 }
 
