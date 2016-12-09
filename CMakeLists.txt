@@ -72,7 +72,7 @@ target_link_libraries ("GapCutter"  ${gatb-core-libraries})
 target_link_libraries ("GapMerger"  ${gatb-core-libraries})
 
 # we add a compiler flag
-SET(CXX_WARNINGS "-Wall -Weverything -Wno-c++98-compat -Wno-vla-extension -Wno-c++98-compat-pedantic")
+SET(CXX_WARNINGS "-Wall")# -Weverything -Wno-c++98-compat -Wno-vla -Wno-vla-extension -Wno-c++98-compat-pedantic")
 SET(GCC_COMPILE_MAP_FLAGS "-std=c++0x -g")
 SET(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${GCC_COMPILE_MAP_FLAGS} ${CXX_WARNINGS}")
 

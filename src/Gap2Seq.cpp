@@ -1,7 +1,7 @@
 /*****************************************************************************
  *  Gap2Seq
  *  Copyright (C) Leena Salmela, Kristoffer Sahlin, Veli Mäkinen,
- *  Alexandru Tomescu 2015
+ *  Alexandru Tomescu, Riku Walve 2017
  *
  *  Contact: leena.salmela@cs.helsinki.fi
  *
@@ -35,7 +35,7 @@
 
 #include <Gap2Seq.hpp>
 
-//#define DEBUG
+// #define DEBUG
 
 // Maximum number of paths for counting
 #define MAX_PATHS (INT_MAX/2-1)
@@ -46,7 +46,6 @@
 #define DEFAULT_DIST_ERR "500"
 #define DEFAULT_FUZ "10"
 #define DEFAULT_MAX_MEMORY "20"  // Maximum memory usage of DP table per thread
-
 
 /********************************************************************************/
 
@@ -99,33 +98,40 @@ ISynchronizer *global_lock;
 std::unordered_map<long long, long long> memuse;
 
 // Print statistics for gap filling
-void print_statistics(int filledStart, int gapStart, int gapEnd, int paths, char *buf, int fuz, int k, int left_fuz, int right_fuz, bool skip_confident, bool unique_paths, subgraph_stats substats, int gap, std::string comment) {
+void print_statistics(int filledStart, int gapStart, int gapEnd,
+    int paths, char *buf,
+    int k, int left_max_fuz, int right_max_fuz, int left_fuz, int right_fuz,
+    bool skip_confident, bool unique_paths, const struct subgraph_stats &substats,
+    int gap, const std::string &comment) {
   #ifndef SINGLE_THREAD
     {
       LocalSynchronizer local(global_lock);
   #endif
 
       if (paths > 0 && (!unique_paths || paths == 1)) {
-        int filledLen = (int)strlen(&buf[fuz-left_fuz])-k;
+        int filledLen = (int)strlen(&buf[left_max_fuz-left_fuz])-k;
 
         int lower=0, upper=0;
         if (!skip_confident) {
           for (int j = 0; j < filledLen; j++) {
-            if (isupper(buf[j+fuz-left_fuz])) {
+            if (isupper(buf[j+left_max_fuz-left_fuz])) {
               upper++;
             } else {
               lower++;
             }
           }
 
-          std::cout << "Scaffold: " << comment << " GapStart: " << gapStart << " GapEnd: " << gapEnd <<
-            " GapLength: " << gap << " PathsFound: " << paths << " FilledStart: " << filledStart <<
-            " FilledEnd: " << filledStart + filledLen << " FilledGapLength: " <<  filledLen <<
-            " LeftFuz: " << left_fuz << " RightFuz: " << right_fuz << " ConfidentBases: " << upper << " TotalBases: " << (upper+lower) << std::endl;
-          std::cout << "SubgraphStats: Vertices: " << substats.vertices << " Edges: " <<
-            substats.edges << " NontrivialStrongComponents: " << substats.nontrivial_components <<
-            " SizeNontrivialStrongComponents: " << substats.size_nontrivial_components << " VerticesFinal: " <<
-            substats.vertices_final << " EdgesFinal: " << substats.edges_final << std::endl;
+          std::cout << "Scaffold: " << comment <<
+            " GapStart: " << gapStart << " GapEnd: " << gapEnd << " GapLength: " << gap <<
+            " PathsFound: " << paths <<
+            " FilledStart: " << filledStart << " FilledEnd: " << filledStart + filledLen << " FilledGapLength: " <<  filledLen <<
+            " LeftMaxFuz: " << left_max_fuz << " LeftFuz: " << left_fuz << " RightMaxFuz: " << right_max_fuz << " RightFuz: " << right_fuz <<
+            " ConfidentBases: " << upper << " TotalBases: " << (upper+lower) << std::endl;
+
+          std::cout << "SubgraphStats: Vertices: " << substats.vertices <<
+            " Edges: " << substats.edges << " NontrivialStrongComponents: " << substats.nontrivial_components <<
+            " SizeNontrivialStrongComponents: " << substats.size_nontrivial_components <<
+            " VerticesFinal: " << substats.vertices_final << " EdgesFinal: " << substats.edges_final << std::endl;
         } else {
           std::cout << "Scaffold: " << comment << " GapStart: " << gapStart << " GapEnd: " << gapEnd <<
             " GapLength: " << gap << " PathsFound: " << paths << " FilledStart: " << filledStart <<
@@ -134,13 +140,16 @@ void print_statistics(int filledStart, int gapStart, int gapEnd, int paths, char
         }
       } else {
         if (paths == -1) {
-          std::cout << "Scaffold: " << comment << " GapStart: " << gapStart << " GapEnd: " << gapEnd <<
-            " GapLength: " << gap << " PathsFound: 0 FilledStart: 0 FilledEnd: 0 FilledGapLength: 0 LeftFuz: " << left_fuz <<
-            " RightFuz: " << right_fuz << " Memory limit exceeded" << std::endl;
+          std::cout << "Scaffold: " << comment <<
+            " GapStart: " << gapStart << " GapEnd: " << gapEnd << " GapLength: " << gap <<
+            " PathsFound: 0 FilledStart: 0 FilledEnd: 0 FilledGapLength: 0" <<
+            " LeftMaxFuz: " << left_max_fuz << " LeftFuz: " << left_fuz << " RightMaxFuz: " << right_max_fuz << " RightFuz: " << right_fuz <<
+            " Memory limit exceeded" << std::endl;
         } else {
-          std::cout << "Scaffold: " << comment << " GapStart: " << gapStart << " GapEnd: " << gapEnd <<
-          " GapLength: " << gap << " PathsFound: " << paths << " FilledStart: 0 FilledEnd: 0 FilledGapLength: 0 LeftFuz: " << left_fuz <<
-          " RightFuz: " << right_fuz << std::endl;
+          std::cout << "Scaffold: " << comment <<
+            " GapStart: " << gapStart << " GapEnd: " << gapEnd << " GapLength: " << gap <<
+            " PathsFound: 0 FilledStart: 0 FilledEnd: 0 FilledGapLength: 0" <<
+            " LeftMaxFuz: " << left_max_fuz << " LeftFuz: " << left_fuz << " RightMaxFuz: " << right_max_fuz << " RightFuz: " << right_fuz << std::endl;
         }
       }
   #ifndef SINGLE_THREAD
@@ -161,7 +170,7 @@ void Gap2Seq::execute ()
   int solid = getInput()->getInt(STR_SOLID_THRESHOLD);
   std::string reads = getInput()->getStr(STR_READS);
   int d_err = getInput()->getInt(STR_DIST_ERROR);
-  int fuz = getInput()->getInt(STR_FUZ);
+  int max_fuz = getInput()->getInt(STR_FUZ);
   long long max_mem = (long long)(getInput()->getDouble(STR_MAX_MEM) * 1024*1024*1024);
   std::string readsGraph = reads + ".h5";
   bool skip_confident = (getInput()->get(STR_SKIP_CONFIDENT) != 0);
@@ -173,7 +182,7 @@ void Gap2Seq::execute ()
   // std::cout << "Scaffolds file: " << scaffolds << std::endl;
   // std::cout << "Filled scaffolds file: " << filled_scaffolds << std::endl;
   std::cout << "Distance error: " << d_err << std::endl;
-  std::cout << "Fuz: " << fuz << std::endl;
+  std::cout << "Max Fuz: " << max_fuz << std::endl;
   std::cout << "Max memory: " << max_mem << std::endl;
   std::cout << "Skip confident: " << skip_confident << std::endl;
   std::cout << "Unique: " << unique_paths << std::endl;
@@ -208,17 +217,23 @@ void Gap2Seq::execute ()
 
   std::cout << graph.getInfo() << std::endl;
 
+  // Fill a single gap
   if (getParser()->saw(STR_LEFT) && getParser()->saw(STR_RIGHT) && getParser()->saw(STR_LENGTH)) {
-    std::string kmer_left = getInput()->getStr(STR_LEFT);
-    std::string kmer_right = getInput()->getStr(STR_RIGHT);
-    int length = getInput()->getInt(STR_LENGTH);
+    const std::string left_flank = getInput()->getStr(STR_LEFT);
+    const std::string right_flank = getInput()->getStr(STR_RIGHT);
+    const int length = getInput()->getInt(STR_LENGTH);
 
-    // TODO: Use non-static flanks, i.e. flanks are >= k upto k+fuz
-    assert(kmer_left.length() == k+fuz);
-    assert(right_flank.length() == k+fuz);
+    if (left_flank.length() < k || right_flank.length() < k) {
+      std::cerr << "Flanks need to be at least k length" << std::endl;
+      return;
+    }
+
+    // Count max fuz for both flanks
+    int left_max_fuz = std::min((int) left_flank.length() - k, max_fuz);
+    int right_max_fuz = std::min((int) right_flank.length() - k, max_fuz);
 
     // Buffer to hold the sequence to fill the gap
-    char *buf = new char[length+k+d_err+2*fuz+1+2];
+    char *buf = new char[length+k+d_err+left_max_fuz+right_max_fuz+1+2];
 
     // How many k-mers on the edge of the gap are ignored by the paths
     int left_fuz = 0, right_fuz = 0;
@@ -227,15 +242,20 @@ void Gap2Seq::execute ()
     struct subgraph_stats substats;
 
     // Number of paths found
-    int s = 0;
-    s = fill_gap(graph, kmer_left, kmer_right, length+k, d_err, fuz, k, max_mem, &left_fuz, &right_fuz, buf, skip_confident, &substats);
-    print_statistics(0, kmer_left.length(), kmer_left.length(), s, buf, fuz, k, left_fuz, right_fuz, skip_confident, unique_paths, substats, 0, "");
+    int num_of_paths = fill_gap(graph, left_flank, right_flank,
+      length, k, d_err, left_max_fuz, right_max_fuz, &left_fuz, &right_fuz,
+      max_mem, buf, skip_confident, &substats);
+
+    // Print the statistics on the filled gap
+    int filledStart = left_flank.length() - left_max_fuz-left_fuz;
+    print_statistics(filledStart, left_flank.length(), left_flank.length()+length, num_of_paths, buf,
+      k, left_max_fuz, right_max_fuz, left_fuz, right_fuz,
+      skip_confident, unique_paths, substats, length, "");
 
     // At least one path found
-	  if (s > 0 && (!unique_paths || s == 1)) {
+    if (num_of_paths > 0 && (!unique_paths || num_of_paths == 1)) {
       // Remove ignored edges from flanks, insert filled sequence and output
-      // TODO: right flank is included?
-      std::cout << kmer_left.substr(0, k+fuz-left_fuz) << &buf[fuz-left_fuz] << std::endl;
+      std::cout << left_flank.substr(0, left_flank.length()-left_fuz) << &buf[left_max_fuz-left_fuz] << std::endl;
     }
 
     return;
@@ -319,52 +339,59 @@ void Gap2Seq::execute ()
 #ifndef SINGLE_THREAD
 	}
 #endif
-	// The first possible starting position for left k-mer
-	int kmer_start = i-k-fuz;
-	// The length of gap
-	int gap = 0;
+
+  // The first possible starting position for left k-mer
+  int left_max_fuz = std::min(((int) i + k) - prevGapEnd, max_fuz);
+	int kmer_start = i-k-left_max_fuz;
+
 	// Measure the gap length
+	int gap = 0;
 	while (i < seq.size() && (seq[i] == 'N' || seq[i] == 'n')) {
 	  i++;
 	  gap++;
 	}
 
 	// Check that the end k-mer is complete, i.e. no N's and enough sequence
-	bool ok = i+k+fuz <= seq.size() ? true : false;
-	for (int j = 0; j < k+fuz && ok; j++) {
+  int right_max_fuz = std::min((int) seq.size() - ((int) i + k), max_fuz);
+	bool ok = i+k+right_max_fuz <= seq.size() ? true : false;
+	for (int j = 0; j < k+right_max_fuz && ok; j++) {
 	  if (seq[i+j] == 'N' || seq[i+j] == 'n')
 	    ok = false;
 	}
 
 	// Check that the start k-mer is complete
 	if (kmer_start >= prevGapEnd && ok) {
-    // Buffer to hold the sequence to fill the gap
-    char *buf = new char[gap+k+d_err+2*fuz+1+2];
-
     // How many k-mers on the edge of the gap are ignored by the paths
-    int left_fuz=0, right_fuz=0;
+    int left_fuz = 0, right_fuz = 0;
+
+    // Buffer to hold the sequence to fill the gap
+    char *buf = new char[gap+k+d_err+left_max_fuz+right_max_fuz+1+2];
 
     // Struct for subgraph statistics
     struct subgraph_stats substats;
 
     // Number of paths found
     int s = 0;
-    s = fill_gap(graph, seq.substr(kmer_start,k+fuz), seq.substr(i,k+fuz), gap+k, d_err, fuz, k, max_mem, &left_fuz, &right_fuz, buf, skip_confident, &substats);
+    s = fill_gap(graph, seq.substr(kmer_start, k+left_max_fuz), seq.substr(i, k+right_max_fuz), gap,
+        k, d_err, left_max_fuz, right_max_fuz, &left_fuz, &right_fuz,
+        max_mem, buf, skip_confident, &substats);
 
-    int filledStart = filledSeq.length() + kmer_start+k+fuz-left_fuz-prevGapEnd;
-    int gapStart = kmer_start+k+fuz;
-    print_statistics(filledStart, gapStart, i, s, buf, fuz, k, left_fuz, right_fuz, skip_confident, unique_paths, substats, gap, comment);
+    int filledStart = filledSeq.length() + kmer_start+k+left_max_fuz-left_fuz-prevGapEnd;
+    int gapStart = kmer_start+k+left_max_fuz;
+    print_statistics(filledStart, gapStart, i, s, buf, k,
+      left_max_fuz, right_max_fuz, left_fuz, right_fuz,
+      skip_confident, unique_paths, substats, gap, comment);
 
     // At least one path was found
     if (s > 0 && (!unique_paths || s == 1)) {
       filledgapcount++;
 
   #ifdef DEBUG
-      std::cout << "Fill: " << &buf[fuz-left_fuz] << std::endl;
+      std::cout << "Fill: " << &buf[left_max_fuz-left_fuz] << std::endl;
   #endif
 
       // Add seq from end of previous gap to gap start and the gap fill sequence
-      filledSeq = seq.substr(prevGapEnd, kmer_start+k+fuz-left_fuz-prevGapEnd) + (string)&buf[fuz-left_fuz];
+      filledSeq = seq.substr(prevGapEnd, kmer_start+k+left_max_fuz-left_fuz-prevGapEnd) + (string)&buf[left_max_fuz-left_fuz];
 
       // Remove the right kmer
       filledSeq = filledSeq.substr(0, filledSeq.length()-k);
@@ -374,13 +401,13 @@ void Gap2Seq::execute ()
     } else {
       // No paths found, keep the gap
       // Add seq from end of previous gap to end of this gap
-      filledSeq = filledSeq + seq.substr(prevGapEnd, kmer_start+k+fuz+gap-prevGapEnd);
+      filledSeq = filledSeq + seq.substr(prevGapEnd, kmer_start+k+left_max_fuz+gap-prevGapEnd);
     }
     delete [] buf;
 	} else {
 	  // Either left or right k-mer is not complete
 	  // Add seq from end of previous gap to end of this gap
-	  filledSeq = filledSeq + seq.substr(prevGapEnd, kmer_start+k+fuz+gap-prevGapEnd);
+	  filledSeq = filledSeq + seq.substr(prevGapEnd, kmer_start+k+left_max_fuz+gap-prevGapEnd);
 	}
 	// This gap has been processed
 	prevGapEnd = i;
@@ -878,15 +905,11 @@ struct node_hash {
 // right_fuz: The number of actual ignored nucleotides on the right end of the gap
 // fill: The sequence to fill the gap. Start offset of actual sequence in fill is fuz - left_fuz,
 //       the fill seq always includes the right kmer
-int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right, int gap_len, int gap_err, int fuz, int k, long long max_mem, int *left_fuz, int *right_fuz, char *fill, bool skip_confident, struct subgraph_stats *substats) {
-
-  // For simplicity, force gap_len and gap_err to be even
-  if (gap_len % 2 == 1) {
-    gap_len++;
-  }
-  if (gap_err % 2 == 1) {
-    gap_err++;
-  }
+int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const std::string &kmer_right, int gap_len,
+    int k, int gap_err, int left_max_fuz, int right_max_fuz, int *left_fuz, int *right_fuz,
+    long long max_mem, char *fill, bool skip_confident, struct subgraph_stats *substats) {
+  const int right_half = right_max_fuz + (int) ceilf((gap_len + gap_err) / 2.f);
+  const int left_half = left_max_fuz + (int) floorf((gap_len + gap_err) / 2.f);
 
   long long id = System::thread().getThreadSelf();
 #ifndef SINGLE_THREAD
@@ -931,7 +954,7 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
     }
 
     if (me == NULL) {
-      me = new map_element2(gap_len/2+gap_err/2+fuz);
+      me = new map_element2(right_half);
       reachableSetRight[node] = me;
     }
 
@@ -954,11 +977,11 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
 #endif
 
   // BFS loop from the right until depth d/2+fuz is reached
-  while(currentD <= gap_len/2+gap_err/2+fuz+1 && mymemuse < max_mem) {
+  while(currentD < right_half && mymemuse < max_mem) {
     currentD++;
 
 #ifdef DEBUG
-    std::cout << "currentD: " << currentD << " Limit: " << gap_len/2+gap_err/2+fuz << std::endl;
+    std::cout << "currentD: " << currentD << " Limit: " << right_half << std::endl;
     std::cout << "Memuse: " << mymemuse << std::endl;
 #endif
 
@@ -989,6 +1012,7 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
       // Get the neightbors of the node and update their dp rows
       Graph::Vector<Node> neighbors = graph.predecessors(n);
       map_element2 *node_me = reachableSetRight[n];
+
       // Number of paths to the parent node
       bool num_paths = n.strand == STRAND_FORWARD ? node_me->getf(currentD-1) : node_me->getr(currentD-1);
 
@@ -1000,7 +1024,7 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
 	}
 
 	if (me == NULL) {
-	  me = new map_element2(gap_len/2+gap_err/2+fuz);
+	  me = new map_element2(right_half);
 	  reachableSetRight[neighbors[i]] = me;
 	}
 	if (neighbors[i].strand == STRAND_FORWARD) {
@@ -1022,7 +1046,7 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
     border.swap(nextBorder);
 
     // Add next starting k-mer if one still exists
-    if (currentD <= fuz) {
+    if (currentD <= right_max_fuz) {
       std::string kmer = kmer_right.substr(kmer_right.length()-k-currentD, k);
       Node node = graph.buildNode(Data((char *)kmer.c_str()));
 #ifdef DEBUG
@@ -1044,7 +1068,7 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
 	}
 
 	if (me == NULL) {
-	  me = new map_element2(gap_len+gap_err+2*fuz);
+	  me = new map_element2(right_half+left_half);
 	  reachableSetRight[node] = me;
 	}
 
@@ -1107,7 +1131,7 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
     }
 
     if (me == NULL) {
-      me = new map_element(gap_len+gap_err+2*fuz);
+      me = new map_element(right_half+left_half);
       reachableSetLeft[node] = me;
     }
 
@@ -1131,9 +1155,9 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
 #endif
 
   // BFS loop until depth d/2+fuz is reached
-  while(currentD <= gap_len+gap_err+2*fuz && mymemuse < max_mem) {
+  while(currentD <= right_half+left_half && mymemuse < max_mem) {
 #ifdef DEBUG
-    std::cout << "currentD: " << currentD << " Limit: " << gap_len/2+gap_err/2+fuz << std::endl;
+    std::cout << "currentD: " << currentD << " Limit: " << right_half+left_half << std::endl;
     std::cout << "Memuse: " << mymemuse << std::endl;
 #endif
 
@@ -1168,7 +1192,7 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
       int num_paths = n.strand == STRAND_FORWARD ? node_me->getf(currentD-1) : node_me->getr(currentD-1);
 
       for (size_t i = 0; i < neighbors.size(); i++) {
-	if (currentD < gap_len/2+gap_err/2+fuz || reachableSetRight.find(neighbors[i]) != reachableSetRight.end()) {
+	if (currentD < gap_len/2+gap_err/2+left_max_fuz || reachableSetRight.find(neighbors[i]) != reachableSetRight.end()) {
 	  map_element *me = NULL;
 
 	  if (reachableSetLeft.find(neighbors[i]) != reachableSetLeft.end()) {
@@ -1176,7 +1200,7 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
 	  }
 
 	  if (me == NULL) {
-	    me = new map_element(gap_len+gap_err+2*fuz);
+	    me = new map_element(right_half+left_half);
 	    reachableSetLeft[neighbors[i]] = me;
 	  }
 	  if (neighbors[i].strand == STRAND_FORWARD) {
@@ -1210,12 +1234,12 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
     border.swap(nextBorder);
 
     // Add next starting k-mer if one still exists
-    if (currentD <= fuz) {
+    if (currentD <= left_max_fuz) {
       std::string kmer = kmer_left.substr(currentD, k);
       Node node = graph.buildNode(Data((char *)kmer.c_str()));
 #ifdef DEBUG
       if (!graph.contains(node)) {
-	std::cout << "Kmer " << kmer_left << " cannot be found in the graph!" << std::endl;
+	std::cout << "Kmer " << kmer << " cannot be found in the graph!" << std::endl;
       }
 #endif
 
@@ -1232,7 +1256,7 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
 	}
 
 	if (me == NULL) {
-	  me = new map_element(gap_len+gap_err+2*fuz);
+	  me = new map_element(gap_len+gap_err+left_max_fuz+right_max_fuz);
 	  reachableSetLeft[node] = me;
 	}
 
@@ -1249,12 +1273,12 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
     }
 
     // Check if a path has been found
-    if (currentD >= gap_len+2*fuz) {
-      int err = currentD - gap_len - 2*fuz;
+    if (currentD >= gap_len) {
+      int err = currentD - gap_len - (left_max_fuz + right_max_fuz);
 
       // Iterate over the k-mers in the right edge of the gap
-      for (int j = 0; j <= fuz && count == 0; j++) {
-	std::string rkmer = kmer_right.substr(j,k);
+      for (int j = 0; j <= right_max_fuz && count == 0; j++) {
+	std::string rkmer = kmer_right.substr(j, k);
 	Node rnode = graph.buildNode(Data((char *)rkmer.c_str()));
 
 #ifdef DEBUG
@@ -1278,8 +1302,8 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
 	} else {
 	  // +fuz: path lengths are counted starting from the first allowed left k-mer
 	  // +j: j nucleotides were ignored on the right side thus widening the gap
-	  int actual_gap_len1 = gap_len + fuz + j + err;
-	  int actual_gap_len2 = gap_len + fuz + j - err;
+	  int actual_gap_len1 = gap_len + left_max_fuz + j + err;
+	  int actual_gap_len2 = gap_len + left_max_fuz + j - err;
 
 	  if (rnode.strand == STRAND_FORWARD) {
 	    if (right->getf(actual_gap_len1) >= 1) {
@@ -1355,13 +1379,14 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
 
 	      while(currentD2 >= 0) {
 		Node lnode;
-		if (currentD2 <= fuz) {
+		if (currentD2 <= left_max_fuz) {
 		  lnode = graph.buildNode(Data((char *)kmer_left.substr(currentD2,k).c_str()));
 		}
 		for(auto it = backBorder.begin(); it != backBorder.end(); ++it) {
 		  current = (Node) *it;
+
 		  // Check for end condition
-		  if (currentD2 > fuz || current != lnode) {
+		  if (currentD2 > left_max_fuz || current != lnode) {
 		    Graph::Vector<Node> neighbors = graph.predecessors(current);
 		    for (size_t i = 0; i < neighbors.size(); i++) {
 		      Node n = neighbors[i];
@@ -1503,7 +1528,7 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
 	    }
 
 #ifdef DEBUG
-	    write_graphviz(std::cout, subgraph, boost::make_label_writer(branch));
+	    // write_graphviz(std::cout, subgraph, boost::make_label_writer(branch));
 #endif
 	  }
 
@@ -1529,13 +1554,13 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
 #endif
 
 	    // Check for end condition
-	    if (currentD2 <= fuz) {
+	    if (currentD2 <= left_max_fuz) {
 	      Node lnode = graph.buildNode(Data((char *)kmer_left.substr(currentD2,k).c_str()));
 #ifdef DEBUG
 	      std::cout << kmer_left << " " << graph.toString(lnode) << " " << graph.toString(current) << std::endl;
 #endif
 	      if (lnode == current) {
-		*left_fuz = fuz-currentD2;
+		*left_fuz = left_max_fuz-currentD2;
 		break;
 	      }
 	    }
@@ -1614,7 +1639,7 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
     std::cout << "Reachable set: " << std::endl;
     for(auto it = reachableSetRight.begin(); it != reachableSetRight.end(); ++it) {
       std::cout << graph.toString(it->first) << std::endl;
-      for(int i = 0; i <= gap_len+gap_err+2*fuz; i++) {
+      for(int i = 0; i <= gap_len+gap_err+left_max_fuz+right_max_fuz; i++) {
 	if (it->first.strand == STRAND_FORWARD) {
 	  std::cout << " " << (it->second)->getf(i);
 	} else {
@@ -1669,7 +1694,7 @@ int Gap2Seq::fill_gap(Graph graph, std::string kmer_left, std::string kmer_right
   return count;
 }
 
-std::set<Node> Gap2Seq::extract_reachable_nodes(Graph graph, std::string kmer, int d) {
+std::set<Node> Gap2Seq::extract_reachable_nodes(const Graph &graph, const std::string &kmer, int d) {
   std::set<Node> border;
   std::set<Node> nextBorder;
   int currentD = 0;

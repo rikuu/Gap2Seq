@@ -71,11 +71,12 @@ public:
     void execute ();
 
     // Extract nodes reachable from a given kmer with given distance
-  std::set<Node> extract_reachable_nodes(Graph graph, std::string kmer, int d);
+  std::set<Node> extract_reachable_nodes(const Graph &graph, const std::string &kmer, int d);
 
   // Fill a gap
-  int fill_gap(Graph graph, std::string kmer_left, std::string kmer_right, int c, int d, int fuz, int k, long long max_mem, int *left_fuz, int *right_fuz, char *fill, bool skip_confident, struct subgraph_stats *substats);
-
+  int fill_gap(const Graph &graph, const std::string &kmer_left, const std::string &kmer_right, int gap_len,
+      int k, int gap_err, int left_max_fuz, int right_max_fuz, int *left_fuz, int *right_fuz,
+      long long max_mem, char *fill, bool skip_confident, struct subgraph_stats *substats);
 };
 
 /********************************************************************************/
