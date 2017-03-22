@@ -1,6 +1,7 @@
 /*****************************************************************************
- *  GapCutter
- *  Copyright (C) Riku Walve 2015
+ *  Gap2Seq
+ *  Copyright (C) Leena Salmela, Kristoffer Sahlin, Veli Mäkinen,
+ *  Alexandru Tomescu, Riku Walve 2017
  *
  *  Contact: leena.salmela@cs.helsinki.fi
  *

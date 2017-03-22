@@ -223,6 +223,7 @@ void Gap2Seq::execute ()
     const std::string right_flank = getInput()->getStr(STR_RIGHT);
     const int length = getInput()->getInt(STR_LENGTH);
 
+    // TODO: Also check for Ns in flanks
     if (left_flank.length() < k || right_flank.length() < k) {
       std::cerr << "Flanks need to be at least k length" << std::endl;
       return;
@@ -371,10 +372,10 @@ void Gap2Seq::execute ()
     struct subgraph_stats substats;
 
     // Number of paths found
-    int s = 0;
-    s = fill_gap(graph, seq.substr(kmer_start, k+left_max_fuz), seq.substr(i, k+right_max_fuz), gap,
-        k, d_err, left_max_fuz, right_max_fuz, &left_fuz, &right_fuz,
-        max_mem, buf, skip_confident, &substats);
+    int s = fill_gap(graph, seq.substr(kmer_start, k+left_max_fuz),
+        seq.substr(i, k+right_max_fuz), gap, k, d_err, left_max_fuz,
+        right_max_fuz, &left_fuz, &right_fuz, max_mem, buf, skip_confident,
+        &substats);
 
     int filledStart = filledSeq.length() + kmer_start+k+left_max_fuz-left_fuz-prevGapEnd;
     int gapStart = kmer_start+k+left_max_fuz;
@@ -1426,74 +1427,98 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
 	    }
 
 	    std::vector<size_t> components(boost::num_vertices(subgraph));
-	    size_t num_components = strong_components(subgraph, make_iterator_property_map(components.begin(), get(boost::vertex_index, subgraph), components[0]));
+      const size_t num_components = boost::strong_components(subgraph,
+        make_iterator_property_map(components.begin(), get(boost::vertex_index, subgraph), components[0]));
 
 #ifdef DEBUG
 	    std::cout << "Size of the path subgraph: " << boost::num_vertices(subgraph) << " / " <<  boost::num_edges(subgraph)  <<std::endl;
 	    std::cout << "Strongly connected components: " << num_components << std::endl;
 #endif
 
-	    int csize[num_components];
+      int csize[num_components];
+      for (size_t i = 0; i < num_components; i++) {
+        csize[i] = 0;
+      }
 
 	    size_t num_real_vertices = boost::num_vertices(subgraph);
 	    size_t num_real_edges = boost::num_edges(subgraph);
 	    size_t num_nontrivial_components = 0;
 	    size_t size_nontrivial_components = 0;
 
-	    if (num_components != boost::num_vertices(subgraph)) {
+      if (num_components != num_real_vertices) {
 #ifdef DEBUG
 	      std::cout << "Subgraph contains cycles" << std::endl;
 #endif
-	      for (size_t i = 0; i < num_components; i++) {
-		csize[i] = 0;
-	      }
-	      for (size_t i = 0; i < boost::num_vertices(subgraph); i++) {
-		csize[components[i]]++;
-	      }
-	      bnode cnode[num_components];
-	      for(size_t i = 0; i < num_components; i++) {
-		if (csize[i] > 1) {
-		  cnode[i] = boost::add_vertex(subgraph);
-		  num_nontrivial_components++;
-		}
-	      }
 	      for (size_t i = 0; i < num_real_vertices; i++) {
-		if (csize[components[i]] > 1) {
-		  size_nontrivial_components++;
-		  boost::graph_traits<digraph>::in_edge_iterator e, end;
-		  for(tie(e,end) = in_edges(i, subgraph); e != end; ++e) {
-		    if (components[i] != components[boost::source(*e, subgraph)]) {
-		      if (csize[components[boost::source(*e, subgraph)]] > 1) {
-			if (boost::source(*e, subgraph) < i) {
-			  boost::add_edge(cnode[components[boost::source(*e, subgraph)]], cnode[components[i]], subgraph);
-			}
-		      } else {
-			boost::add_edge(boost::source(*e, subgraph), cnode[components[i]], subgraph);
-		      }
-		    }
-		  }
-		  boost::graph_traits<digraph>::out_edge_iterator e2, end2;
-		  for(tie(e2,end2) = out_edges(i, subgraph); e2 != end2; ++e2) {
-		    if (components[i] != components[boost::target(*e2, subgraph)]) {
-		      if (csize[components[boost::target(*e2, subgraph)]] > 1) {
-			if (boost::target(*e2, subgraph) < i)
-			  boost::add_edge(cnode[components[i]], cnode[components[boost::target(*e2, subgraph)]], subgraph);
-		      } else {
-			boost::add_edge(cnode[components[i]], boost::target(*e2, subgraph), subgraph);
-		      }
-		    }
-		  }
-		}
+          csize[components[i]]++;
+	      }
+
+	      bnode cnode[num_components];
+	      for (size_t i = 0; i < num_components; i++) {
+          if (csize[i] > 1) {
+            cnode[i] = boost::add_vertex(subgraph);
+            num_nontrivial_components++;
+          }
 	      }
 
 	      for (size_t i = 0; i < num_real_vertices; i++) {
-		if (csize[components[i]] > 1) {
-		  boost::clear_vertex(i, subgraph);
-		}
+          if (csize[components[i]] > 1) {
+            size_nontrivial_components++;
+
+            boost::graph_traits<digraph>::in_edge_iterator e, end;
+            for (boost::tie(e, end) = boost::in_edges(i, subgraph); e != end; ++e) {
+              if (components[i] != components[boost::source(*e, subgraph)]) {
+                if (csize[components[boost::source(*e, subgraph)]] > 1) {
+                  if (boost::source(*e, subgraph) < i) {
+                    boost::add_edge(cnode[components[boost::source(*e, subgraph)]], cnode[components[i]], subgraph);
+                  }
+                } else {
+                  boost::add_edge(boost::source(*e, subgraph), cnode[components[i]], subgraph);
+                }
+              }
+            }
+
+            boost::graph_traits<digraph>::out_edge_iterator e2, end2;
+            for (boost::tie(e2, end2) = boost::out_edges(i, subgraph); e2 != end2; ++e2) {
+              if (components[i] != components[boost::target(*e2, subgraph)]) {
+                if (csize[components[boost::target(*e2, subgraph)]] > 1) {
+                  if (boost::target(*e2, subgraph) < i)
+                    boost::add_edge(cnode[components[i]], cnode[components[boost::target(*e2, subgraph)]], subgraph);
+                } else {
+                  boost::add_edge(cnode[components[i]], boost::target(*e2, subgraph), subgraph);
+                }
+              }
+            }
+          }
+	      }
+
+	      for (size_t i = 0; i < num_real_vertices; i++) {
+          if (csize[components[i]] > 1) {
+            boost::clear_vertex(i, subgraph);
+          }
 	      }
 	    } else {
-	      for (size_t i = 0; i < num_components; i++) {
-		csize[i] = 1;
+        for (size_t i = 0; i < num_components; i++) {
+          csize[i] = 1;
+	      }
+	    }
+
+      // Check for self loops. They need to be removed to ensure the graph is a DAG.
+	    for (size_t i = 0; i < num_real_vertices; i++) {
+	      if (csize[components[i]] <= 1) {
+          boost::graph_traits<digraph>::out_edge_iterator e, end;
+          std::vector<bedge> loops;
+          for (tie(e, end) = out_edges(i, subgraph); e != end; ++e) {
+            if (boost::source(*e, subgraph) == boost::target(*e, subgraph)) {
+              loops.push_back(*e);
+            }
+          }
+
+          for (vector<bedge>::iterator it = loops.begin(); it != loops.end(); ++it) {
+            boost::remove_edge(*it, subgraph);
+          }
+
+          num_real_edges -= loops.size();
 	      }
 	    }
 
@@ -1506,29 +1531,31 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
 
 	    // Count for parallel branches
 	    branch = new int[boost::num_vertices(subgraph)];
-	    for(size_t i = 0; i < boost::num_vertices(subgraph); i++) {
+	    for (size_t i = 0; i < boost::num_vertices(subgraph); i++) {
 	      branch[i] = 0;
 	    }
 
 	    // Topological sorting
 	    container tsorted;
-	    topological_sort(subgraph, std::back_inserter(tsorted));
+	    boost::topological_sort(subgraph, std::back_inserter(tsorted));
 	    int branchcount = 1;
-	    for(container::reverse_iterator it=tsorted.rbegin(); it != tsorted.rend(); ++it) {
-	      bnode n = *it;
-	      if (boost::in_degree(n, subgraph)  >= 1 || boost::out_degree(n, subgraph) >= 1) {
-		if (in_degree(n,subgraph) > 1) {
-		  branchcount -= (in_degree(n, subgraph)-1);
-		}
-		branch[n] = branchcount;
-		if (out_degree(n, subgraph) > 1) {
-		  branchcount += (out_degree(n, subgraph)-1);
-		}
+	    for (container::reverse_iterator it=tsorted.rbegin(); it != tsorted.rend(); ++it) {
+	      const bnode n = *it;
+	      if (boost::in_degree(n, subgraph) >= 1 || boost::out_degree(n, subgraph) >= 1) {
+          if (boost::in_degree(n, subgraph) > 1) {
+            branchcount -= boost::in_degree(n, subgraph) - 1;
+          }
+
+          branch[n] = branchcount;
+
+          if (out_degree(n, subgraph) > 1) {
+            branchcount += boost::out_degree(n, subgraph) - 1;
+          }
 	      }
 	    }
 
 #ifdef DEBUG
-	    // write_graphviz(std::cout, subgraph, boost::make_label_writer(branch));
+	    boost::write_graphviz(std::cout, subgraph, boost::make_label_writer(branch));
 #endif
 	  }
 
@@ -1545,7 +1572,7 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
 	  std::vector<Node> back;
 	  fill[currentD2] = '\0';
 
-	  while(currentD2 >= 0) {
+	  while (currentD2 >= 0) {
 	    // The current k-mer
 	    std::string str = graph.toString(current);
 
@@ -1560,60 +1587,70 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
 	      std::cout << kmer_left << " " << graph.toString(lnode) << " " << graph.toString(current) << std::endl;
 #endif
 	      if (lnode == current) {
-		*left_fuz = left_max_fuz-currentD2;
-		break;
+          *left_fuz = left_max_fuz - currentD2;
+          break;
 	      }
 	    }
 
 	    // Get the in neighbors
 	    if (currentD2 > 0) {
 	      if (skip_confident || branch[node2boost[current]] == 1) {
-		lastSolid = currentD2;
+          lastSolid = currentD2;
 	      }
+
 	      if (currentD2 > lastSolid - k) {
-		fill[currentD2-1] = toupper(str[str.length()-1]);
+          fill[currentD2-1] = toupper(str[str.length()-1]);
 	      } else {
-		fill[currentD2-1] = tolower(str[str.length()-1]);
+          fill[currentD2-1] = tolower(str[str.length()-1]);
 	      }
+
 	      Graph::Vector<Node> neighbors = graph.predecessors(current);
 	      for (size_t i = 0; i < neighbors.size(); i++) {
-		Node n = neighbors[i];
-		if (reachableSetLeft.find(n) != reachableSetLeft.end()) {
-		  if (n.strand == STRAND_FORWARD) {
-		    if (reachableSetLeft[n]->getf(currentD2-1) > 0) {
-		      back.push_back(n);
-		    }
-		  } else {
-		    if (reachableSetLeft[n]->getr(currentD2-1) > 0) {
-		      back.push_back(n);
-		    }
-		  }
-		}
+          Node n = neighbors[i];
+          if (reachableSetLeft.find(n) != reachableSetLeft.end()) {
+            if (n.strand == STRAND_FORWARD) {
+              if (reachableSetLeft[n]->getf(currentD2-1) > 0) {
+                back.push_back(n);
+              }
+            } else {
+              if (reachableSetLeft[n]->getr(currentD2-1) > 0) {
+                back.push_back(n);
+              }
+            }
+          }
 	      }
+
 	      // There should be in-neighbors where the path originated from but check just in case...
 	      if (back.size() == 0) {
-		std::cout << "Unable to backtrace! " << currentD2 << " " << currentD << " " << graph.toString(rnode) <<  std::endl;
-		// Free memory
-		for(auto it = reachableSetLeft.begin(); it != reachableSetLeft.end(); ++it) {
-		  delete it->second;
-		}
-		for(auto it = reachableSetRight.begin(); it != reachableSetRight.end(); ++it) {
-		  delete it->second;
-		}
-		if (!skip_confident) {
-		  delete [] branch;
-		}
-		return 0;
+          std::cout << "Unable to backtrace! " << currentD2 << " " << currentD << " " << graph.toString(rnode) <<  std::endl;
+
+          // Free memory
+          for(auto it = reachableSetLeft.begin(); it != reachableSetLeft.end(); ++it) {
+            delete it->second;
+          }
+
+          for(auto it = reachableSetRight.begin(); it != reachableSetRight.end(); ++it) {
+            delete it->second;
+          }
+
+          if (!skip_confident) {
+            delete [] branch;
+          }
+
+          return 0;
 	      }
+
 	      // Randomly choose one of the in neighbors
 	      current = back[rand()%(back.size())];
 	    }
 	    currentD2--;
 	    back.clear();
 	  }
+
 	  if (!skip_confident) {
 	    delete [] branch;
 	  }
+
 	  break;
 	}
       }

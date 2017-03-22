@@ -1,7 +1,7 @@
 /*****************************************************************************
  *  Gap2Seq
  *  Copyright (C) Leena Salmela, Kristoffer Sahlin, Veli Mäkinen,
- *  Alexandru Tomescu 2014
+ *  Alexandru Tomescu, Riku Walve 2017
  *
  *  Contact: leena.salmela@cs.helsinki.fi
  *
@@ -34,6 +34,7 @@
 
 typedef boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirectionalS > digraph;
 typedef boost::graph_traits<digraph>::vertex_descriptor bnode;
+typedef boost::graph_traits<digraph>::edge_descriptor bedge;
 typedef std::vector<bnode> container;
 
 // Check if a file is readable

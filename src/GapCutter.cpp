@@ -1,6 +1,7 @@
 /*****************************************************************************
- *  GapCutter
- *  Copyright (C) Riku Walve 2015
+ *  Gap2Seq
+ *  Copyright (C) Leena Salmela, Kristoffer Sahlin, Veli Mäkinen,
+ *  Alexandru Tomescu, Riku Walve 2017
  *
  *  Contact: leena.salmela@cs.helsinki.fi
  *
@@ -172,7 +173,7 @@ void GapCutter::execute ()
     // Get contig identifier from the sequence comment
     const size_t contigNamePos = itSeq->getComment().find(" ");
     const std::string contigName = (contigNamePos == std::string::npos) ?
-      itSeq->getComment() : itSeq->getComment().substr(contigNamePos);
+      itSeq->getComment() : itSeq->getComment().substr(0, contigNamePos);
 
     size_t i = 0;
     while (i < seq.size()) {
