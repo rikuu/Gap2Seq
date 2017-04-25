@@ -50,31 +50,34 @@ ENDIF (NOT CXX_HAS_LAMBDA)
 # we get compilation definitions from the gatb-core part
 add_definitions (${gatb-core-flags})
 
-# we give the headers directories from :
-#       - from project source
-#       - from GATB-CORE source
-#       - from dsk source
-include_directories (SYSTEM src  ${gatb-core-includes})
+# htslib
+SET(HTSLIB_HOME ${PROJECT_SOURCE_DIR}/thirdparty/htslib/)
+link_directories (${HTSLIB_HOME})
+
+include_directories (SYSTEM src  ${gatb-core-includes} ${HTSLIB_HOME})
 
 # we define the files to be compiled
 file (GLOB  GAP2SEQ_SOURCES  src/Gap2Seq.cpp src/main.cpp)
 file (GLOB  GAPCUTTER_SOURCES  src/GapCutter.cpp)
 file (GLOB  GAPMERGER_SOURCES  src/GapMerger.cpp)
+file (GLOB  READFILTER_SOURCES  src/ReadFilter.cpp)
 
 # we define the artifact to be built: the project binary
-add_executable ("Gap2Seq"  ${GAP2SEQ_SOURCES})
+add_executable ("Gap2Seq-core"  ${GAP2SEQ_SOURCES})
 add_executable ("GapCutter"  ${GAPCUTTER_SOURCES})
 add_executable ("GapMerger"  ${GAPMERGER_SOURCES})
+add_executable ("ReadFilter"  ${READFILTER_SOURCES})
 
 # we define which libraries to be linked with project binary
-target_link_libraries ("Gap2Seq"  ${gatb-core-libraries})
+target_link_libraries ("Gap2Seq-core"  ${gatb-core-libraries})
 target_link_libraries ("GapCutter"  ${gatb-core-libraries})
 target_link_libraries ("GapMerger"  ${gatb-core-libraries})
+target_link_libraries ("ReadFilter"  ${gatb-core-libraries} hts)
 
 # we add a compiler flag
-SET(CXX_WARNINGS "-Wall")# -Weverything -Wno-c++98-compat -Wno-vla -Wno-vla-extension -Wno-c++98-compat-pedantic")
+SET(CXX_WARNINGS "-Wall -Wextra")
 SET(GCC_COMPILE_MAP_FLAGS "-std=c++0x -g")
 SET(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${GCC_COMPILE_MAP_FLAGS} ${CXX_WARNINGS}")
 
 # we add the main executable script
-FILE(COPY Gap2Seq.sh DESTINATION .)
+FILE(COPY src/Gap2Seq.py DESTINATION Gap2Seq)

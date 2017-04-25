@@ -1,7 +1,7 @@
 /*****************************************************************************
  *  Gap2Seq
- *  Copyright (C) Leena Salmela, Kristoffer Sahlin, Veli Mäkinen,
- *  Alexandru Tomescu 2014
+ *  Copyright (C) Leena Salmela, Kristoffer Sahlin, Veli MÃ¤kinen,
+ *  Alexandru Tomescu, Riku Walve 2017
  *
  *  Contact: leena.salmela@cs.helsinki.fi
  *
@@ -37,4 +37,3 @@ int main (int argc, char* argv[])
 
     return EXIT_SUCCESS;
 }
-

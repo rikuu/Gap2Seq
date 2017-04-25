@@ -1,3 +1,6 @@
 [submodule "thirdparty/gatb-core"]
 	path = thirdparty/gatb-core
 	url = https://github.com/GATB/gatb-core.git
+[submodule "thirdparty/htslib"]
+	path = thirdparty/htslib
+	url = https://github.com/samtools/htslib
