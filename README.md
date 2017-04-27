@@ -1,17 +1,12 @@
-Gap2Seq
-Contact: leena.salmela@cs.helsinki.fi
+# Gap2Seq
 
---------
-Overview
---------
+Gap2Seq is a program for filling gaps in scaffolds produced by genome assembly
+tools using short read data such as reads produced by Illumina sequencing.
 
-Gap2Seq is a program for filling gaps in scaffolds produced by
-genome assembly tools using short read data such as reads produced by
-Illumina sequencing.
+Since version 3.0, it can also genotype insertions from variant calls produced
+by variant calling tools.
 
----------
-Reference
----------
+## Reference
 
 L. Salmela, K. Sahlin, V. Mäkinen, and A.I. Tomescu: Gap filling as
 exact path length problem. In Proc. RECOMB 2015, LNBI 9029, Springer
@@ -24,34 +19,31 @@ common to all solutions. In Proc. WABI 2016, LNBI 9838, Springer
 R. Walve, L. Salmela, V. Mäkinen: Variant Genotyping with Gap Filling.
 (Submitted)
 
--------------------
-System Requirements
--------------------
+## Requirements
 
-Gap2Seq has been tested on systems running Linux on a X86_64
-architecture. Gap2Seq uses GATB library
-(http://gatb-core.gforge.inria.fr/index.html) for the de Bruijn graph
-implementation and htslib () for reading alignments for read filtering. The
-libraries are included in the Gap2Seq package.
+Gap2Seq has been tested on systems running Linux on a X86_64 architecture.
+Gap2Seq uses GATB library (http://gatb-core.gforge.inria.fr/index.html) for the
+de Bruijn graph implementation and htslib (http://www.htslib.org) for reading
+alignments for read filtering. The libraries are included in the Gap2Seq
+package.
 
 Compiling Gap2Seq requires gcc version 4.5 or newer and cmake.
 
-------------
-Installation
-------------
+## Installation
 
 Unpack the Gap2Seq package.
 For compiling Gap2Seq run
 
-    mkdir build;  cd build;  cmake ..;  make
+```
+mkdir build;  cd build;  cmake ..;  make
+```
 
 The main script Gap2Seq and the binaries Gap2Seq-core, GapMerger, GapCutter and
 ReadFilter can then be found in the build directory.
 
------
-Usage
------
+## Usage
 
+```
 Gap2Seq [parameters]
 
 Required parameters:
@@ -70,10 +62,9 @@ Optional parameters:
 -nb-cores                    number of cores to use [default 0 (all cores)]
 -verbose                     verbosity level (currently does not affect much?)  [default 1]
 -help                        display help about possible options
+```
 
--------
-Example
--------
+## Example
 
 This example shows how to run Gap2Seq on the GAGE S. aureus data.
 
@@ -86,18 +77,19 @@ Unpack the data files.
 
 Run Gap2Seq (here we run it for the SGA scaffolds)
 
-    Gap2Seq -scaffolds Assembly/SGA/genome.scf.fasta -filled Assembly/SGA/genome.scf.fill.fasta -reads Data/original/frag_1.fastq,Data/original/frag_2.fastq,Data/original/shortjump_1.fastq,Data/original/shortjump_2.fastq
+```
+Gap2Seq -scaffolds Assembly/SGA/genome.scf.fasta -filled Assembly/SGA/genome.scf.fill.fasta -reads Data/original/frag_1.fastq,Data/original/frag_2.fastq,Data/original/shortjump_1.fastq,Data/original/shortjump_2.fastq
+```
 
 The filled scaffolds are then in the file Assembly/SGA/genome.scf.fill.fasta.
 
-------------------
-New in Version 3.0
-------------------
-
-Optional per-gap read filtering when run with new script.
+## Changelog
+### Version 3.0
 
 Gap2Seq.sh is replaced with a Python script, which accepts gaps/scaffolds in
 FASTA/FASTQ and VCF formats and reads in FASTA/FASTQ and SAM/BAM formats.
+
+Optional per-gap read filtering when run with new script.
 
 Gap2Seq binary is renamed Gap2Seq-core and can still be used instead of the new
 script.
@@ -107,33 +99,25 @@ k+fuz.
 
 Switched to GATB-core 1.2.2.
 
-------------------
-New in Version 2.0
-------------------
+### Version 2.0
 
 Parallelization is now on gap level when run with the Gap2Seq.sh script.
 
 Safe bases inserted into gaps are outputted in upper case and unsafe
 bases are outputted in lower case.
 
-------------------
-New in Version 1.0
-------------------
+### Version 1.0
 
 Optimized version of the algorithm.
 
 Output now indicates on which gaps search was aborted because of the
 memory limit.
 
-------------------
-New in Version 0.3
-------------------
+### Version 0.3
 
 Reorganized parallel execution.
 
-------------------
-New in Version 0.2
-------------------
+### Version 0.2
 
 Proper synchronization for access to the memuse hash table.
 

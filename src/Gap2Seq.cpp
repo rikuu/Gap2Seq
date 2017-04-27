@@ -83,7 +83,6 @@ Gap2Seq::Gap2Seq() : Tool("Gap2Seq")
     getParser()->push_front (new OptionNoParam (STR_SKIP_CONFIDENT, "If specified, all filled bases are in upper case.",  false, false));
     getParser()->push_front (new OptionNoParam (STR_UNIQUE, "If specified, only gaps with a unique path of best length are filled.",  false, false));
 
-    // TODO: Integrate all gap cutting and remove these
     getParser()->push_front (new OptionOneParam (STR_LEFT, "Left flank of a single gap", false, ""));
     getParser()->push_front (new OptionOneParam (STR_RIGHT, "Right flank of a single gap", false, ""));
     getParser()->push_front (new OptionOneParam (STR_LENGTH, "Length of a single gap", false, ""));

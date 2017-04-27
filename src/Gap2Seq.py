@@ -210,15 +210,18 @@ def start_fillers(bed, gaps, libraries, queue=None, pool=None, k=31, fuz=10, sol
 
     gap_id = 0
 
+    jobs = []
     seq = ''
     for gap in gaps:
         if gap[0] == '>' and seq != '':
-            start_filler(seq, gap_id)
+            jobs.append(start_filler(seq, gap_id))
             gap_id += 1
             seq = ''
         seq += gap
 
-    start_filler(seq, gap_id)
+    jobs.append(start_filler(seq, gap_id))
+
+    return jobs
 
 # Run GapCutter, i.e. cut scaffolds into contigs and gaps
 def cut_gaps(scaffolds, contigs_file = 'tmp.contigs', gap_file = 'tmp.gaps',
@@ -376,16 +379,18 @@ if __name__ == '__main__':
         pool.apply_async(listener, (queue, args['out']))
 
     print('Starting gapfillers')
-    start_fillers(args['bed'], args['gaps'], libraries, queue=queue, pool=pool,
+    jobs = start_fillers(args['bed'], args['gaps'], libraries, queue=queue, pool=pool,
         k=args['k'], fuz=args['fuz'], solid=args['solid'], max_mem=max_mem)
 
     args['bed'].close()
     args['gaps'].close()
 
     if args['threads'] > 1:
+        for job in jobs:
+            job.get()
+        queue.put('kill')
         pool.close()
         pool.join()
-        queue.put('kill')
 
     if scaffolds_cut:
         print('Merging filled gaps and contigs')
