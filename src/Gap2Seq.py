@@ -105,10 +105,12 @@ def listener(queue, filename):
 
 # Runs all the read filtering and gap filling for a single gap
 def fill_gap(libraries, gap, k, fuz, solid, max_mem, queue = None):
-
     # Cleanup, just to be sure
     reads_base = 'tmp.reads.' + gap.id + '.'
     subprocess.check_call(['rm', '-f', reads_base + '*'])
+
+    # TODO: Get a more accurate value?
+    flank_length = k + fuz
 
     # Extract reads
     reads = []
@@ -116,7 +118,9 @@ def fill_gap(libraries, gap, k, fuz, solid, max_mem, queue = None):
         filtered_length = 0
         for i, lib in enumerate(libraries):
             reads_file = reads_base + str(i)
-            subprocess.check_call([READFILTER, '-reads', reads_file] + \
+            subprocess.check_call([READFILTER,
+                '-reads', reads_file,
+                '-flank-length', flank_length] + \
                 gap.data() + lib.data(), stderr=f, stdout=f)
 
             # If no reads are extracted, no file exists
@@ -133,7 +137,8 @@ def fill_gap(libraries, gap, k, fuz, solid, max_mem, queue = None):
         if (filtered_length / gap.length) < threshold:
             for i, lib in enumerate(libraries):
                 reads_file = reads_base + str(i) + '.unmapped'
-                subprocess.check_call([READFILTER, '-unmapped-only',
+                subprocess.check_call([READFILTER,
+                    '-unmapped-only',
                     '-reads', reads_file] + gap.data() + lib.data(),
                     stderr=f, stdout=f)
 
