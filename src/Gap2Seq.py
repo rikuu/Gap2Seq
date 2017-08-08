@@ -26,6 +26,7 @@ import os, sys
 import subprocess, multiprocessing
 import datetime
 
+script_dir = os.path.dirname(os.path.realpath(__file__))
 isexecutable = lambda f: os.path.isfile(f) and os.access(f, os.X_OK)
 def find_executable(path_hints, name):
     for path_hint in path_hints:
@@ -37,10 +38,10 @@ def find_executable(path_hints, name):
     sys.exit(1)
 
 # Find required tools
-GAPMERGER = find_executable(['./', '../'], 'GapMerger')
-GAPCUTTER = find_executable(['./', '../'], 'GapCutter')
-GAP2SEQ = find_executable(['./', '../'], 'Gap2Seq')
-READFILTER = find_executable(['./', '../'], 'ReadFilter')
+GAPMERGER = find_executable([script_dir, './', '../'], 'GapMerger')
+GAPCUTTER = find_executable([script_dir, './', '../'], 'GapCutter')
+GAP2SEQ = find_executable([script_dir, './', '../'], 'Gap2Seq-core')
+READFILTER = find_executable([script_dir, './', '../'], 'ReadFilter')
 
 # An object for holding all the data for a library of short reads
 class Library:
