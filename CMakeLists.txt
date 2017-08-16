@@ -5,8 +5,8 @@ cmake_minimum_required(VERSION 2.6)
 ################################################################################
 # Define cmake modules directory
 ################################################################################
-SET (GATB_CORE_HOME  ${PROJECT_SOURCE_DIR}/thirdparty/gatb-core/gatb-core)
-SET (CMAKE_MODULE_PATH ${GATB_CORE_HOME}/cmake)
+set (GATB_CORE_HOME  ${PROJECT_SOURCE_DIR}/thirdparty/gatb-core/gatb-core)
+set (CMAKE_MODULE_PATH ${GATB_CORE_HOME}/cmake)
 
 ################################################################################
 # THIRD PARTIES
@@ -51,7 +51,7 @@ ENDIF (NOT CXX_HAS_LAMBDA)
 add_definitions (${gatb-core-flags})
 
 # htslib
-SET(HTSLIB_HOME ${PROJECT_SOURCE_DIR}/thirdparty/htslib/)
+set (HTSLIB_HOME ${PROJECT_SOURCE_DIR}/thirdparty/htslib/)
 link_directories (${HTSLIB_HOME})
 
 include_directories (SYSTEM src  ${gatb-core-includes} ${HTSLIB_HOME})
@@ -75,9 +75,9 @@ target_link_libraries ("GapMerger"  ${gatb-core-libraries})
 target_link_libraries ("ReadFilter"  ${gatb-core-libraries} hts)
 
 # we add a compiler flag
-SET(CXX_WARNINGS "-Wall -Wextra")
-SET(GCC_COMPILE_MAP_FLAGS "-std=c++0x -g")
-SET(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${GCC_COMPILE_MAP_FLAGS} ${CXX_WARNINGS}")
+set (CXX_WARNINGS "-Wall -Wextra")
+set (GCC_COMPILE_MAP_FLAGS "-std=c++0x -g")
+set (CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${GCC_COMPILE_MAP_FLAGS} ${CXX_WARNINGS}")
 
 # we add the main executable script
-FILE(COPY src/Gap2Seq.py DESTINATION Gap2Seq)
+configure_file ("${CMAKE_SOURCE_DIR}/src/Gap2Seq.py" "${CMAKE_CURRENT_BINARY_DIR}/Gap2Seq" COPYONLY)
