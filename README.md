@@ -47,21 +47,27 @@ ReadFilter can then be found in the build directory.
 Gap2Seq [parameters]
 
 Required parameters:
--scaffolds <FASTA/Q file>    scaffolds to be gap filled
--filled <FASTA file>         output file for filled scaffolds
--reads <FASTA/Q files>       short reads, several files can be specified as a list separated by ','
+-f, --filled <FASTA file>   output file for filled scaffolds
+-r, --reads <FASTA/Q files> short reads, several files can be specified as a list separated by ','
+
+-s, --scaffolds <FASTA/Q file>
+
+-g, --gaps <FASTA/Q file>
+-b, --bed <BED file>
 
 Optional parameters:
--max-mem <float>             maximum memory usage of DP table computation in gigabytes (excluding DBG) [default 20]
--fuz <int>                   number of nucleotides to ignore on gap fringes  [default 10]
--dist-error <int>            maximum error in gap estimates  [default 500]
--solid <int>                 threshold for solid k-mers for building the DBG [default 2]
--k <int>                     kmer length for DBG  [default 31]
--all-upper                   If specified, all filled bases are in upper case.
--unique                      If specified, only gaps with a unique path of best length are filled.
--nb-cores                    number of cores to use [default 0 (all cores)]
--verbose                     verbosity level (currently does not affect much?)  [default 1]
--help                        display help about possible options
+-l, --libraries <lib conf>   
+
+-t, --threads <int>         number of threads to use  [default 1]
+-k <int>                    kmer length for DBG  [default 31]
+--max-mem <float>           maximum memory usage of DP table computation in gigabytes (excluding DBG) [default 20]
+--fuz <int>                 number of nucleotides to ignore on gap fringes  [default 10]
+--dist-error <int>          maximum error in gap estimates  [default 500]
+--solid <int>               threshold for solid k-mers for building the DBG [default 2]
+-all-upper		    If specified, all filled bases are in upper case.
+-unique			    If specified, only gaps with a unique path of best length are filled.
+-best-only		    If specified, only paths that have optimal length are considered.
+-h, --help                  show this help message and exit
 ```
 
 ## Example
@@ -75,13 +81,44 @@ http://gage.cbcb.umd.edu/data/Staphylococcus_aureus/Assembly.tgz
 
 Unpack the data files.
 
+### Regular
+
 Run Gap2Seq (here we run it for the SGA scaffolds)
 
 ```
-Gap2Seq -scaffolds Assembly/SGA/genome.scf.fasta -filled Assembly/SGA/genome.scf.fill.fasta -reads Data/original/frag_1.fastq,Data/original/frag_2.fastq,Data/original/shortjump_1.fastq,Data/original/shortjump_2.fastq
+Gap2Seq --scaffolds Assembly/SGA/genome.scf.fasta --filled Assembly/SGA/genome.scf.fill.fasta --reads Data/original/frag_1.fastq,Data/original/frag_2.fastq,Data/original/shortjump_1.fastq,Data/original/shortjump_2.fastq
 ```
 
 The filled scaffolds are then in the file Assembly/SGA/genome.scf.fill.fasta.
+
+### With read filtering
+
+Align, sort, and index the read libraries to the scaffolds with e.g. BWA MEM.
+
+```
+bwa index Assembly/SGA/genome.scf.fasta
+
+bwa mem Assembly/SGA/genome.scf.fasta Data/original/frag_1.fastq Data/original/frag_2.fastq | samtools sort -O bam - > Data/original/frag.bam
+samtools index Data/original/frag.bam
+
+bwa mem Assembly/SGA/genome.scf.fasta Data/original/shortjump_1.fastq Data/original/shortjump_2.fastq | samtools sort -O bam - > Data/original/shortjump.bam
+samtools index Data/original/shortjump.bam
+```
+
+Create a read library configuration file, a tab-separated list with a single
+read library per line:
+bam, read length, mean insert size, std dev, threshold
+
+```
+echo -e "Data/original/frag.bam\t101\t180\t18\t40" > libraries.txt
+echo -e "Data/original/shortjump.bam\t37\t3500\t350\t40" >> libraries.txt
+```
+
+Run Gap2Seq.
+
+```
+Gap2Seq --scaffolds Assembly/SGA/genome.scf.fasta --filled Assembly/SGA/genome.scf.fill.fasta --libraries libraries.txt
+```
 
 ## Changelog
 ### Version 3.0

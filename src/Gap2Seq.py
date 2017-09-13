@@ -22,10 +22,12 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ##############################################################################
 
+from __future__ import print_function
 import os, sys
 import subprocess, multiprocessing
 import datetime
 
+script_dir = os.path.dirname(os.path.realpath(__file__))
 isexecutable = lambda f: os.path.isfile(f) and os.access(f, os.X_OK)
 def find_executable(path_hints, name):
     for path_hint in path_hints:
@@ -37,10 +39,10 @@ def find_executable(path_hints, name):
     sys.exit(1)
 
 # Find required tools
-GAPMERGER = find_executable(['./', '../'], 'GapMerger')
-GAPCUTTER = find_executable(['./', '../'], 'GapCutter')
-GAP2SEQ = find_executable(['./', '../'], 'Gap2Seq')
-READFILTER = find_executable(['./', '../'], 'ReadFilter')
+GAPMERGER = find_executable([script_dir, './', '../'], 'GapMerger')
+GAPCUTTER = find_executable([script_dir, './', '../'], 'GapCutter')
+GAP2SEQ = find_executable([script_dir, './', '../'], 'Gap2Seq-core')
+READFILTER = find_executable([script_dir, './', '../'], 'ReadFilter')
 
 # An object for holding all the data for a library of short reads
 class Library:
@@ -104,41 +106,49 @@ def listener(queue, filename):
             f.flush()
 
 # Runs all the read filtering and gap filling for a single gap
-def fill_gap(libraries, gap, k, fuz, solid, max_mem, queue = None):
-
+def fill_gap(libraries, gap, k, fuz, solid, derr, max_mem, reads=None, queue=None):
     # Cleanup, just to be sure
     reads_base = 'tmp.reads.' + gap.id + '.'
     subprocess.check_call(['rm', '-f', reads_base + '*'])
 
+    # TODO: Get a more accurate value?
+    flank_length = str(k + fuz)
+
     # Extract reads
-    reads = []
-    with open('tmp.extract.' + gap.id + '.log', 'w') as f:
-        filtered_length = 0
-        for i, lib in enumerate(libraries):
-            reads_file = reads_base + str(i)
-            subprocess.check_call([READFILTER, '-reads', reads_file] + \
-                gap.data() + lib.data(), stderr=f, stdout=f)
-
-            # If no reads are extracted, no file exists
-            if not os.path.isfile(reads_file):
-                continue
-
-            reads.append(reads_file)
-
-            grep = subprocess.check_output('grep \'^[^>;]\' ' + reads_file + ' | wc -c', shell=True)
-            filtered_length += int(grep)
-
-        # Thresholding has to be done here in case of multiple libraries
-        threshold = sum([lib.threshold for lib in libraries])
-        if (filtered_length / gap.length) < threshold:
+    extracted = False
+    if reads == None:
+        extracted = True
+        reads = []
+        with open('tmp.extract.' + gap.id + '.log', 'w') as f:
+            filtered_length = 0
             for i, lib in enumerate(libraries):
-                reads_file = reads_base + str(i) + '.unmapped'
-                subprocess.check_call([READFILTER, '-unmapped-only',
-                    '-reads', reads_file] + gap.data() + lib.data(),
-                    stderr=f, stdout=f)
+                reads_file = reads_base + str(i)
+                subprocess.check_call([READFILTER,
+                    '-reads', reads_file,
+                    '-flank-length', flank_length] + \
+                    gap.data() + lib.data(), stderr=f, stdout=f)
 
-                if os.path.isfile(reads_file):
-                    reads.append(reads_file)
+                # If no reads are extracted, no file exists
+                if not os.path.isfile(reads_file):
+                    continue
+
+                reads.append(reads_file)
+
+                grep = subprocess.check_output('grep \'^[^>;]\' ' + reads_file + ' | wc -c', shell=True)
+                filtered_length += int(grep)
+
+            # Thresholding has to be done here in case of multiple libraries
+            threshold = sum([lib.threshold for lib in libraries])
+            if (filtered_length / gap.length) < threshold:
+                for i, lib in enumerate(libraries):
+                    reads_file = reads_base + str(i) + '.unmapped'
+                    subprocess.check_call([READFILTER,
+                        '-unmapped-only',
+                        '-reads', reads_file] + gap.data() + lib.data(),
+                        stderr=f, stdout=f)
+
+                    if os.path.isfile(reads_file):
+                        reads.append(reads_file)
 
     # Run Gap2Seq on the gap with the filtered reads
     log = ''
@@ -148,6 +158,7 @@ def fill_gap(libraries, gap, k, fuz, solid, max_mem, queue = None):
             '-fuz', str(fuz),
             '-solid', str(solid),
             '-nb-cores', '1',
+            '-dist-error', str(derr),
             '-max-mem', str(max_mem),
             '-reads', ','.join(reads)] + gap.filler_data(),
             stderr=f)
@@ -167,7 +178,8 @@ def fill_gap(libraries, gap, k, fuz, solid, max_mem, queue = None):
         fill = gap.left + ('N' * gap.length) + gap.right
 
     # Cleanup reads
-    subprocess.check_call(['rm', '-f'] + reads)
+    if extracted:
+        subprocess.check_call(['rm', '-f'] + reads)
 
     # Remove logs and temporary/intermediate files
     subprocess.check_call(['rm', '-f',
@@ -198,34 +210,43 @@ def parse_gap(bed, gap, id):
     return Gap(scaffold, position, length, left, right, comment, id)
 
 # Starts multiple gapfilling processes in parallel
-def start_fillers(bed, gaps, libraries, queue=None, pool=None, k=31, fuz=10, solid=2,
-        max_mem=20):
+def start_fillers(bed, gaps, libraries, queue=None, pool=None, k=31, fuz=10,
+        solid=2, derr=500, max_mem=20, reads=None):
     start_filler = lambda seq, gap_id: fill_gap(libraries, parse_gap(bed, seq,
-        str(gap_id)), k, fuz, solid, max_mem)
+        str(gap_id)), k, fuz, solid, derr, max_mem, reads)
 
     if pool != None:
         start_filler = lambda seq, gap_id: pool.apply_async(fill_gap,
             args=([libraries, parse_gap(bed, seq, str(gap_id)), k, fuz,
-                solid, max_mem, queue]))
+                solid, derr, max_mem, reads, queue]))
 
     gap_id = 0
 
+    jobs = []
     seq = ''
     for gap in gaps:
         if gap[0] == '>' and seq != '':
-            start_filler(seq, gap_id)
+            jobs.append(start_filler(seq, gap_id))
             gap_id += 1
             seq = ''
         seq += gap
 
-    start_filler(seq, gap_id)
+    jobs.append(start_filler(seq, gap_id))
+
+    return jobs
 
 # Run GapCutter, i.e. cut scaffolds into contigs and gaps
 def cut_gaps(scaffolds, contigs_file = 'tmp.contigs', gap_file = 'tmp.gaps',
         bed_file = 'tmp.bed'):
-    if os.path.isfile(contigs_file): print('%s exists' % contigs_file)
-    if os.path.isfile(gap_file): print('%s exists' % gap_file)
-    if os.path.isfile(bed_file): print('%s exists' % bed_file)
+    if os.path.isfile(contigs_file):
+        print('%s exists' % contigs_file)
+        sys.exit(1)
+    if os.path.isfile(gap_file):
+        print('%s exists' % gap_file)
+        sys.exit(1)
+    if os.path.isfile(bed_file):
+        print('%s exists' % bed_file)
+        sys.exit(1)
 
     subprocess.check_call([GAPCUTTER,
             '-scaffolds', scaffolds,
@@ -300,48 +321,58 @@ def count_gaps(bed):
 
 if __name__ == '__main__':
     import argparse
-    parser = argparse.ArgumentParser(description='Gap2Seq with optional read filtering.')
+    parser = argparse.ArgumentParser(description='Gap2Seq 3.0')
 
     # filler.py specific arguments
-    parser.add_argument('-o', '--out', type=str, default='filled.fasta')
-    parser.add_argument('-t', '--threads', type=int, default=1)
+    parser.add_argument('-f', '--filled', required=True, type=str, help="output file for filled scaffolds")
+    parser.add_argument('-t', '--threads', type=int, default=1, help="number of threads to use")
 
     # Gap2Seq specific arguments
-    parser.add_argument('-k', type=int, default=31)
-    parser.add_argument('--fuz', type=int, default=10)
-    parser.add_argument('--solid', type=int, default=2)
-    parser.add_argument('--max-mem', type=float, default=20)
+    parser.add_argument('-k', type=int, default=31, help="kmer length for DBG  [default 31]")
+    parser.add_argument('--fuz', type=int, default=10, help="number of nucleotides to ignore on gap fringes  [default 10]")
+    parser.add_argument('--solid', type=int, default=2, help="threshold for solid k-mers for building the DBG [default 2]")
+    parser.add_argument('--max-mem', type=float, default=20, help="maximum memory usage of DP table computation in gigabytes (excluding DBG) [default 20]")
+    parser.add_argument('--dist-error', type=int, default=500, help="maximum error in gap estimates  [default 500]")
 
     # Either a set of mapped read libraries or a set of fasta-formatted reads
     # Tab-separated list:
     # bam, read_length, mean_insert_size, std_dev, threshold
-    parser.add_argument('-l', '--libraries', required=True, help="List of aligned read libraries")
+    parser.add_argument('-l', '--libraries', type=str, help="List of aligned read libraries")
     parser.add_argument('-i', '--index', type=int, default=-1, help=argparse.SUPPRESS)
+
+    parser.add_argument('-r', '--reads', type=str, help="short reads")
 
     # One of three options is required for gap data:
     # 1. Cut gaps and bed from some scaffolds
-    parser.add_argument('-s', '--scaffolds', type=str)
+    parser.add_argument('-s', '--scaffolds', type=str, help="")
 
     # 2. Use pre-cut gaps and bed
-    parser.add_argument('-b', '--bed', type=argparse.FileType('r'))
-    parser.add_argument('-g', '--gaps', type=argparse.FileType('r'))
+    parser.add_argument('-b', '--bed', type=argparse.FileType('r'), help="")
+    parser.add_argument('-g', '--gaps', type=argparse.FileType('r'), help="")
 
     # 3. Generate gaps and bed from VCF
-    parser.add_argument('-v', '--vcf', type=argparse.FileType('r'), help="EXPERIMENTAL")
-    parser.add_argument('-r', '--reference', type=argparse.FileType('r'), help="EXPERIMENTAL")
+    parser.add_argument('-v', '--vcf', type=argparse.FileType('r'), help=argparse.SUPPRESS)
+    parser.add_argument('-R', '--reference', type=argparse.FileType('r'), help=argparse.SUPPRESS)
 
     args = vars(parser.parse_args())
 
     # Short read libraries aligned to the scaffolds
     libraries = []
-    with open(args['libraries'], 'r') as f:
-        for lib in f:
-            arg = lib.split('\t')
-            libraries += [Library(arg[0], int(arg[1]), int(arg[2]), int(arg[3]), int(arg[4]))]
+    if args['libraries'] != None:
+        with open(args['libraries'], 'r') as f:
+            for lib in f:
+                arg = lib.split('\t')
+                libraries += [Library(arg[0], int(arg[1]), int(arg[2]), int(arg[3]), int(arg[4]))]
 
-    # Use only 1 library
-    if args['index'] != -1:
-        libraries = [libraries[args['index']]]
+        # Use only 1 library
+        if args['index'] != -1:
+            libraries = [libraries[args['index']]]
+    elif args['reads'] != None:
+        args['reads'] = args['reads'].split(',')
+    else:
+        parser.print_help()
+        print('Either [-r/--reads], or [-l/--libraries] is required.')
+        exit(1)
 
     scaffolds_cut = False
     if args['bed'] == None or args['gaps'] == None:
@@ -349,14 +380,14 @@ if __name__ == '__main__':
             print('Cutting gaps')
             args['bed'], args['gaps'] = cut_gaps(args['scaffolds'])
             scaffolds_cut = True
-            args['final_out'] = args['out']
-            args['out'] = 'tmp.filled'
+            args['final_out'] = args['filled']
+            args['filled'] = 'tmp.filled'
         elif args['vcf'] != None:
             print('Parsing VCF')
             args['bed'], args['gaps'] = cut_vcf(args['vcf'], args['reference'], args['k'], args['fuz'])
         else:
             parser.print_help()
-            print('Either [-b/--bed and -g/--gaps], [-v/--vcf and -r/--reference], or [-s/--scaffolds] are required.')
+            print('Either [-s/--scaffolds], [-b/--bed and -g/--gaps], or [-v/--vcf and -R/--reference] are required.')
             exit(1)
 
     count_gaps(args['bed'])
@@ -373,22 +404,25 @@ if __name__ == '__main__':
 
     # Start listening for filled gaps
     if args['threads'] > 1:
-        pool.apply_async(listener, (queue, args['out']))
+        pool.apply_async(listener, (queue, args['filled']))
 
     print('Starting gapfillers')
-    start_fillers(args['bed'], args['gaps'], libraries, queue=queue, pool=pool,
-        k=args['k'], fuz=args['fuz'], solid=args['solid'], max_mem=max_mem)
+    jobs = start_fillers(args['bed'], args['gaps'], libraries, queue=queue,
+        pool=pool, k=args['k'], fuz=args['fuz'], solid=args['solid'],
+        derr=args['dist_error'], max_mem=max_mem, reads=args['reads'])
 
     args['bed'].close()
     args['gaps'].close()
 
     if args['threads'] > 1:
+        for job in jobs:
+            job.get()
+        queue.put('kill')
         pool.close()
         pool.join()
-        queue.put('kill')
 
     if scaffolds_cut:
         print('Merging filled gaps and contigs')
-        merge_gaps(args['out'], args['final_out'])
+        merge_gaps(args['filled'], args['final_out'])
 
     print('Filled %i out of %i gaps' % (successful_gaps, num_of_gaps))

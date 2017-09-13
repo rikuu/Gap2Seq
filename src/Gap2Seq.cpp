@@ -85,7 +85,6 @@ Gap2Seq::Gap2Seq() : Tool("Gap2Seq")
     getParser()->push_front (new OptionNoParam (STR_BEST_ONLY, "If specified, only paths that have optimal length are considered.",  false, false));
     getParser()->push_front (new OptionNoParam (STR_UNIQUE, "If specified, only gaps with a unique path of best length are filled.",  false, false));
 
-    // TODO: Integrate all gap cutting and remove these
     getParser()->push_front (new OptionOneParam (STR_LEFT, "Left flank of a single gap", false, ""));
     getParser()->push_front (new OptionOneParam (STR_RIGHT, "Right flank of a single gap", false, ""));
     getParser()->push_front (new OptionOneParam (STR_LENGTH, "Length of a single gap", false, ""));
