@@ -77,7 +77,7 @@ public:
   // Fill a gap
   int fill_gap(const Graph &graph, const std::string &kmer_left, const std::string &kmer_right, int gap_len,
       int k, int gap_err, int left_max_fuz, int right_max_fuz, int *left_fuz, int *right_fuz,
-      long long max_mem, char *fill, bool skip_confident, struct subgraph_stats *substats);
+      long long max_mem, char *fill, bool skip_confident, bool all_paths, struct subgraph_stats *substats);
 };
 
 /********************************************************************************/
