@@ -171,7 +171,7 @@ def fill_gap(libraries, gap, k, fuz, solid, derr, max_mem, reads=None, queue=Non
 
     filled = False
     fill = log.split(b'\n')
-    if len(fill) > 146:
+    if len(fill) > 147:
         filled = True
         fill = fill[-3].decode()
     else:
