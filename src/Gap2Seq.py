@@ -104,6 +104,7 @@ def listener(queue, filename):
 
             f.write(comment + '\n' + fill + '\n')
             f.flush()
+    return successful_gaps
 
 # Runs all the read filtering and gap filling for a single gap
 def fill_gap(libraries, gap, k, fuz, solid, derr, max_mem, reads=None, queue=None):
@@ -413,7 +414,7 @@ if __name__ == '__main__':
 
     # Start listening for filled gaps
     if args['threads'] > 1:
-        pool.apply_async(listener, (queue, args['filled']))
+        res = pool.apply_async(listener, (queue, args['filled']))
 
     print('Starting gapfillers')
     jobs = start_fillers(args['bed'], args['gaps'], libraries, queue=queue,
@@ -427,6 +428,7 @@ if __name__ == '__main__':
         for job in jobs:
             job.get()
         queue.put('kill')
+        successful_gaps=res.get(timeout=1)
         pool.close()
         pool.join()
 
