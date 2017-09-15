@@ -153,15 +153,24 @@ def fill_gap(libraries, gap, k, fuz, solid, derr, max_mem, reads=None, queue=Non
     # Run Gap2Seq on the gap with the filtered reads
     log = ''
     with open('tmp.gap2seq.' + gap.id + '.log', 'w') as f:
-        log = subprocess.check_output([GAP2SEQ,
+        wd = os.getcwd()
+        wd_new = wd + '/tmp.' + gap.id
+        subprocess.check_call(['mkdir', wd_new])
+        os.chdir(wd_new)
+        reads_final = []
+        for r in reads:
+            reads_final.append(os.path.join('..', r))
+        log = subprocess.check_output([os.path.join('..', GAP2SEQ),
             '-k', str(k),
             '-fuz', str(fuz),
             '-solid', str(solid),
             '-nb-cores', '1',
             '-dist-error', str(derr),
             '-max-mem', str(max_mem),
-            '-reads', ','.join(reads)] + gap.filler_data(),
+            '-reads', ','.join(reads_final)] + gap.filler_data(),
             stderr=f)
+        os.chdir(wd)
+        subprocess.check_call(['rm', '-r', wd_new])
 
     # Gap2Seq output:
     #  143 lines of graph information
