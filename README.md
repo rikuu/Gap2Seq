@@ -121,6 +121,14 @@ Gap2Seq --scaffolds Assembly/SGA/genome.scf.fasta --filled Assembly/SGA/genome.s
 ```
 
 ## Changelog
+
+### Newest
+
+When classifying filled bases into safe and unsafe bases, all paths
+within the allowed interval are now considered. In the previous
+version, only paths with optimal length were considered. The old
+behaviour can still be invoked using the parameter -best-only.
+
 ### Version 3.0
 
 Gap2Seq.sh is replaced with a Python script, which accepts gaps/scaffolds in
