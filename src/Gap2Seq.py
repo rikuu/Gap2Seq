@@ -284,8 +284,7 @@ def merge_gaps(filled, merged, contigs_file='tmp.contigs'):
 def cut_vcf(vcf, reference_file, k, fuz, contigs_file = 'tmp.contigs',
         gap_file = 'tmp.gaps', bed_file = 'tmp.bed'):
     # Parse chromosomes from the reference into a dictionary
-    # NOTE: Since this loads the entire reference genome into RAM, we will
-    # expect the genome to be short enough.
+    # NOTE: This loads the entire reference genome
     reference = {}
     comment, seq = '', ''
     for line in f:
@@ -306,11 +305,14 @@ def cut_vcf(vcf, reference_file, k, fuz, contigs_file = 'tmp.contigs',
         # Parse VCF fields
         insert_ref = fields[3]
         insert = fields[4][len(insert_ref):]
-        comment, start, end = fields[0], int(fields[1]) - 1, int(fields[1]) + len(insert) - 1
+        comment, start, end = fields[0], int(fields[1]) - 1, \
+            (int(fields[1]) - 1) + (len(insert) - 1)
 
         # Extract kmers from reference seqeuences
-        left = reference[comment][start:start+k+fuz]
-        right = reference[comment][end-(k+fuz):end]
+        left_end = min(start+k+fuz, len(reference[comment]))
+        right_start = max(end-(k+fuz), 0)
+        left = reference[comment][start:left_end]
+        right = reference[comment][right_start:end]
         seq = left + 'N' * len(insert) + right
 
         gap.write('>%s:%i-%i\n%s' % (comment, start, end, seq))
@@ -364,8 +366,8 @@ if __name__ == '__main__':
     parser.add_argument('-g', '--gaps', type=argparse.FileType('r'), help="")
 
     # 3. Generate gaps and bed from VCF
-    parser.add_argument('-v', '--vcf', type=argparse.FileType('r'), help=argparse.SUPPRESS)
-    parser.add_argument('-R', '--reference', type=argparse.FileType('r'), help=argparse.SUPPRESS)
+    parser.add_argument('-v', '--vcf', type=argparse.FileType('r'), help="")
+    parser.add_argument('-R', '--reference', type=argparse.FileType('r'), help="")
 
     args = vars(parser.parse_args())
 

@@ -70,7 +70,7 @@ Optional parameters:
 -h, --help                  show this help message and exit
 ```
 
-## Example
+## Examples
 
 This example shows how to run Gap2Seq on the GAGE S. aureus data.
 
@@ -119,6 +119,18 @@ Run Gap2Seq.
 ```
 Gap2Seq --scaffolds Assembly/SGA/genome.scf.fasta --filled Assembly/SGA/genome.scf.fill.fasta --libraries libraries.txt
 ```
+
+### Insertion genotyping
+
+First, using any insertion/variant calling pipeline, construct a VCF-file of the
+variants in the reads against a reference genome. Then run Gap2Seq supplying it
+with the VCF, reference, and the reads.
+
+```
+Gap2Seq --vcf Assembly/SGA/variants.vcf --reference Assembly/SGA/genome.scf.fasta --filled Assembly/SGA/genome.scf.fill.fasta --reads Data/original/frag_1.fastq,Data/original/frag_2.fastq,Data/original/shortjump_1.fastq,Data/original/shortjump_2.fastq
+```
+
+Insertion genotyping can also be combined with read filtering.
 
 ## Changelog
 
