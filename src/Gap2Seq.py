@@ -31,7 +31,7 @@ script_dir = os.path.dirname(os.path.realpath(__file__))
 isexecutable = lambda f: os.path.isfile(f) and os.access(f, os.X_OK)
 def find_executable(path_hints, name):
     for path_hint in path_hints:
-        path = os.path.join(path_hint, name)
+        path = os.path.abspath(os.path.join(path_hint, name))
         if isexecutable(path):
             return path
 
@@ -158,10 +158,12 @@ def fill_gap(libraries, gap, k, fuz, solid, derr, max_mem, reads=None, queue=Non
         wd_new = wd + '/tmp.' + gap.id
         subprocess.check_call(['mkdir', wd_new])
         os.chdir(wd_new)
+
         reads_final = []
         for r in reads:
             reads_final.append(os.path.join('..', r))
-        log = subprocess.check_output([os.path.join('..', GAP2SEQ),
+
+        log = subprocess.check_output([GAP2SEQ,
             '-k', str(k),
             '-fuz', str(fuz),
             '-solid', str(solid),
@@ -170,6 +172,7 @@ def fill_gap(libraries, gap, k, fuz, solid, derr, max_mem, reads=None, queue=Non
             '-max-mem', str(max_mem),
             '-reads', ','.join(reads_final)] + gap.filler_data(),
             stderr=f)
+
         os.chdir(wd)
         subprocess.check_call(['rm', '-r', wd_new])
 
