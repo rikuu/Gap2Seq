@@ -155,7 +155,7 @@ def fill_gap(libraries, gap, k, fuz, solid, derr, max_mem, reads=None, queue=Non
     log = ''
     with open('tmp.gap2seq.' + gap.id + '.log', 'w') as f:
         wd = os.getcwd()
-        wd_new = wd + '/tmp.' + gap.id
+        wd_new = os.path.join(wd, 'tmp.' + random.randrange(1000, 9999) + '.' + gap.id)
         subprocess.check_call(['mkdir', wd_new])
         os.chdir(wd_new)
 
