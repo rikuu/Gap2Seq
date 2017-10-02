@@ -133,7 +133,7 @@ def fill_gap(libraries, gap, k, fuz, solid, derr, max_mem, reads=None, queue=Non
                 if not os.path.isfile(reads_file):
                     continue
 
-                reads.append(reads_file)
+                reads.append(os.path.abspath(reads_file))
 
                 grep = subprocess.check_output('grep \'^[^>;]\' ' + reads_file + ' | wc -c', shell=True)
                 filtered_length += int(grep)
@@ -149,7 +149,7 @@ def fill_gap(libraries, gap, k, fuz, solid, derr, max_mem, reads=None, queue=Non
                         stderr=f, stdout=f)
 
                     if os.path.isfile(reads_file):
-                        reads.append(reads_file)
+                        reads.append(os.path.abspath(reads_file))
 
     # Run Gap2Seq on the gap with the filtered reads
     log = ''
@@ -159,10 +159,6 @@ def fill_gap(libraries, gap, k, fuz, solid, derr, max_mem, reads=None, queue=Non
         subprocess.check_call(['mkdir', wd_new])
         os.chdir(wd_new)
 
-        reads_final = []
-        for r in reads:
-            reads_final.append(os.path.join('..', r))
-
         try:
             log = subprocess.check_output([GAP2SEQ,
                 '-k', str(k),
@@ -171,7 +167,7 @@ def fill_gap(libraries, gap, k, fuz, solid, derr, max_mem, reads=None, queue=Non
                 '-nb-cores', '1',
                 '-dist-error', str(derr),
                 '-max-mem', str(max_mem),
-                '-reads', ','.join(reads_final)] + gap.filler_data(),
+                '-reads', ','.join(reads)] + gap.filler_data(),
                 stderr=f)
         except subprocess.CalledProcessError:
             log = ""
