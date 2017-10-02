@@ -163,15 +163,18 @@ def fill_gap(libraries, gap, k, fuz, solid, derr, max_mem, reads=None, queue=Non
         for r in reads:
             reads_final.append(os.path.join('..', r))
 
-        log = subprocess.check_output([GAP2SEQ,
-            '-k', str(k),
-            '-fuz', str(fuz),
-            '-solid', str(solid),
-            '-nb-cores', '1',
-            '-dist-error', str(derr),
-            '-max-mem', str(max_mem),
-            '-reads', ','.join(reads_final)] + gap.filler_data(),
-            stderr=f)
+        try:
+            log = subprocess.check_output([GAP2SEQ,
+                '-k', str(k),
+                '-fuz', str(fuz),
+                '-solid', str(solid),
+                '-nb-cores', '1',
+                '-dist-error', str(derr),
+                '-max-mem', str(max_mem),
+                '-reads', ','.join(reads_final)] + gap.filler_data(),
+                stderr=f)
+        except subprocess.CalledProcessError:
+            log = ""
 
         os.chdir(wd)
         subprocess.check_call(['rm', '-r', wd_new])
