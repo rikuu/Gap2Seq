@@ -8,16 +8,15 @@ by variant calling tools.
 
 ## Reference
 
-L. Salmela, K. Sahlin, V. Mäkinen, and A.I. Tomescu: Gap filling as
-exact path length problem. In Proc. RECOMB 2015, LNBI 9029, Springer
-2015, pp. 281-292.
+L. Salmela, K. Sahlin, V. Mäkinen, and A.I. Tomescu: Gap filling as exact path
+length problem. In Proc. RECOMB 2015, LNBI 9029, Springer 2015, pp. 281-292.
 
-L. Salmela, A.I. Tomescu: Safely filling gaps with partial solutions
-common to all solutions. In Proc. WABI 2016, LNBI 9838, Springer
-2016, xiv, short abstract.
+L. Salmela, A.I. Tomescu: Safely filling gaps with partial solutions common to
+all solutions. In Proc. WABI 2016, LNBI 9838, Springer 2016, xiv, short
+abstract.
 
-R. Walve, L. Salmela, V. Mäkinen: Variant Genotyping with Gap Filling.
-(Submitted)
+[R. Walve, L. Salmela, V. Mäkinen: Variant genotyping with gap filling. In PLoS
+ONE 12(9): e0184608.](https://doi.org/10.1371/journal.pone.0184608)
 
 ## Requirements
 
@@ -27,7 +26,8 @@ de Bruijn graph implementation and htslib (http://www.htslib.org) for reading
 alignments for read filtering. The libraries are included in the Gap2Seq
 package.
 
-Compiling Gap2Seq requires gcc version 4.5 or newer and cmake.
+Compiling Gap2Seq requires GCC version 4.5 or newer and CMake version 2.6 or
+newer.
 
 ## Installation
 
@@ -82,7 +82,7 @@ http://gage.cbcb.umd.edu/data/Staphylococcus_aureus/Assembly.tgz
 
 Unpack the data files.
 
-### Regular
+### Without read filtering
 
 Run Gap2Seq (here we run it for the SGA scaffolds)
 
@@ -123,7 +123,7 @@ Gap2Seq --scaffolds Assembly/SGA/genome.scf.fasta --filled Assembly/SGA/genome.s
 
 ### Insertion genotyping
 
-First, using any insertion/variant calling pipeline, construct a VCF-file of the
+First, using any insertion/variant calling pipeline, construct a VCF file of the
 variants in the reads against a reference genome. Then run Gap2Seq supplying it
 with the VCF, reference, and the reads.
 
@@ -137,10 +137,10 @@ Insertion genotyping can also be combined with read filtering.
 
 ### Version 3.1
 
-When classifying filled bases into safe and unsafe bases, all paths
-within the allowed interval are now considered. In the previous
-version, only paths with optimal length were considered. The old
-behaviour can still be invoked using the parameter -best-only.
+When classifying filled bases into safe and unsafe bases, all paths within the
+allowed interval are now considered. In the previous version, only paths with
+optimal length were considered. The old behaviour can still be invoked using
+the parameter -best-only.
 
 ### Version 3.0
 
