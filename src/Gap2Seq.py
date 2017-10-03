@@ -25,7 +25,7 @@
 from __future__ import print_function
 import os, sys
 import subprocess, multiprocessing
-import datetime
+import datetime, random
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
 isexecutable = lambda f: os.path.isfile(f) and os.access(f, os.X_OK)
@@ -155,7 +155,7 @@ def fill_gap(libraries, gap, k, fuz, solid, derr, max_mem, reads=None, queue=Non
     log = b''
     with open('tmp.gap2seq.' + gap.id + '.log', 'w') as f:
         wd = os.getcwd()
-        wd_new = os.path.join(wd, 'tmp.' + random.randrange(1000, 9999) + '.' + gap.id)
+        wd_new = os.path.join(wd, 'tmp.' + str(random.randrange(1000, 9999)) + '.' + gap.id)
         subprocess.check_call(['mkdir', wd_new])
         os.chdir(wd_new)
 
