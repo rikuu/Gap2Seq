@@ -64,9 +64,10 @@ Optional parameters:
 --fuz <int>                 number of nucleotides to ignore on gap fringes  [default 10]
 --dist-error <int>          maximum error in gap estimates  [default 500]
 --solid <int>               threshold for solid k-mers for building the DBG [default 2]
--all-upper		    If specified, all filled bases are in upper case.
--unique			    If specified, only gaps with a unique path of best length are filled.
--best-only		    If specified, only paths that have optimal length are considered.
+--randseed <int>            random seed (0 to use current time)  [default 0]
+--all-upper                 fill all bases in upper case.
+--unique                    fill only gaps with a unique path of best length
+--best-only                 consider only paths that have optimal length
 -h, --help                  show this help message and exit
 ```
 
@@ -134,7 +135,7 @@ Insertion genotyping can also be combined with read filtering.
 
 ## Changelog
 
-### Newest
+### Version 3.1
 
 When classifying filled bases into safe and unsafe bases, all paths
 within the allowed interval are now considered. In the previous
