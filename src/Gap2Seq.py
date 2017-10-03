@@ -152,7 +152,7 @@ def fill_gap(libraries, gap, k, fuz, solid, derr, max_mem, reads=None, queue=Non
                         reads.append(os.path.abspath(reads_file))
 
     # Run Gap2Seq on the gap with the filtered reads
-    log = ''
+    log = b''
     with open('tmp.gap2seq.' + gap.id + '.log', 'w') as f:
         wd = os.getcwd()
         wd_new = os.path.join(wd, 'tmp.' + random.randrange(1000, 9999) + '.' + gap.id)
@@ -170,7 +170,7 @@ def fill_gap(libraries, gap, k, fuz, solid, derr, max_mem, reads=None, queue=Non
                 '-reads', ','.join(reads)] + gap.filler_data(),
                 stderr=f)
         except subprocess.CalledProcessError:
-            log = ""
+            log = b''
 
         os.chdir(wd)
         subprocess.check_call(['rm', '-r', wd_new])
