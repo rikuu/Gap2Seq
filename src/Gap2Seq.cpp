@@ -46,6 +46,7 @@
 #define DEFAULT_DIST_ERR "500"
 #define DEFAULT_FUZ "10"
 #define DEFAULT_MAX_MEMORY "20"  // Maximum memory usage of DP table per thread
+#define DEFAULT_RANDOM_SEED "0"
 
 /********************************************************************************/
 
@@ -61,6 +62,7 @@ static const char* STR_MAX_MEM = "-max-mem";
 static const char* STR_SKIP_CONFIDENT = "-all-upper";
 static const char* STR_BEST_ONLY = "-best-only";
 static const char* STR_UNIQUE = "-unique";
+static const char* STR_RANDOM_SEED = "-randseed";
 
 // For filling a single gap
 static const char* STR_LEFT = "-left";
@@ -73,7 +75,7 @@ Constructor for the tool.
 Gap2Seq::Gap2Seq() : Tool("Gap2Seq")
 {
     // We add some custom arguments for command line interface
-    getParser()->push_front (new OptionOneParam (STR_KMER_LEN, "kmer length",  false, DEFAULT_K));
+    getParser()->push_front (new OptionOneParam (STR_KMER_LEN, "k-mer length",  false, DEFAULT_K));
     getParser()->push_front (new OptionOneParam (STR_SOLID_THRESHOLD, "Threshold for solid k-mers",  false, DEFAULT_SOLID));
     getParser()->push_front (new OptionOneParam (STR_READS, "FASTA/Q files of reads. For several files use a comma separated list.",  true));
     getParser()->push_front (new OptionOneParam (STR_SCAFFOLDS, "FASTA/Q file of scaffolds",  false, ""));
@@ -84,6 +86,7 @@ Gap2Seq::Gap2Seq() : Tool("Gap2Seq")
     getParser()->push_front (new OptionNoParam (STR_SKIP_CONFIDENT, "If specified, all filled bases are in upper case.",  false, false));
     getParser()->push_front (new OptionNoParam (STR_BEST_ONLY, "If specified, only paths that have optimal length are considered.",  false, false));
     getParser()->push_front (new OptionNoParam (STR_UNIQUE, "If specified, only gaps with a unique path of best length are filled.",  false, false));
+    getParser()->push_front (new OptionOneParam (STR_RANDOM_SEED, "Random seed (0 to use current time)",  false, DEFAULT_RANDOM_SEED));
 
     getParser()->push_front (new OptionOneParam (STR_LEFT, "Left flank of a single gap", false, ""));
     getParser()->push_front (new OptionOneParam (STR_RIGHT, "Right flank of a single gap", false, ""));
@@ -163,9 +166,6 @@ Main method for gap filling
 *********************************************************************/
 void Gap2Seq::execute ()
 {
-  // Initialize random number generation for choosing random paths
-  srand(time(NULL));
-
   // Get the command line arguments
   int k = getInput()->getInt(STR_KMER_LEN);
   int solid = getInput()->getInt(STR_SOLID_THRESHOLD);
@@ -177,6 +177,10 @@ void Gap2Seq::execute ()
   bool skip_confident = (getInput()->get(STR_SKIP_CONFIDENT) != 0);
   bool unique_paths = (getInput()->get(STR_UNIQUE) != 0);
   bool all_paths = (getInput()->get(STR_BEST_ONLY) == 0);
+  int randseed = getInput()->getInt(STR_RANDOM_SEED);
+
+  // Initialize random number generation for choosing random paths
+  srand((randseed > 0) ? ((unsigned int) randseed) : ((unsigned int )time(NULL)));
 
   std::cout << "k-mer size: " << k << std::endl;
   std::cout << "Solidity threshold: " << solid << std::endl;
@@ -189,6 +193,7 @@ void Gap2Seq::execute ()
   std::cout << "Skip confident: " << skip_confident << std::endl;
   std::cout << "Unique: " << unique_paths << std::endl;
   std::cout << "All paths: " << all_paths << std::endl;
+  std::cout << "Random seed: " << randseed << std::endl;
 
   // Create de bruijn graph
   Graph graph;
@@ -1383,10 +1388,10 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
     if (!skip_confident) {
       std::unordered_set<Node, node_hash, equal_to<Node>, count_allocator<Node> > backBorder;
       std::unordered_set<Node, node_hash, equal_to<Node>, count_allocator<Node> > nextBackBorder;
-      
+
       bnode sink = boost::add_vertex(subgraph);
       bnode source = boost::add_vertex(subgraph);
-      
+
 #ifdef DEBUG
       std::cout << "PathLengthSize: " << pathLengths.size() << std::endl;
 #endif
@@ -1465,14 +1470,14 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
 	    }
 	  }
 	}
-	
+
 	Node lnode;
 	if (currentD2 <= left_max_fuz) {
 	  lnode = graph.buildNode(Data((char *)kmer_left.substr(currentD2,k).c_str()));
 	}
 	for(auto it = backBorder.begin(); it != backBorder.end(); ++it) {
 	  current = (Node) *it;
-	    
+
 	  // Check for end condition
 	  if (currentD2 > left_max_fuz || current != lnode) {
 	    Graph::Vector<Node> neighbors = graph.predecessors(current);
@@ -1506,7 +1511,7 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
 	    }
 	  }
 	}
-	  
+
 	backBorder.clear();
 	backBorder.swap(nextBackBorder);
 	currentD2--;
@@ -1533,7 +1538,7 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
 	  }
 	  for(auto it = backBorder.begin(); it != backBorder.end(); ++it) {
 	    current = (Node) *it;
-	    
+
 	    // Check for end condition
 	    if (currentD2 > left_max_fuz || current != lnode) {
 	      Graph::Vector<Node> neighbors = graph.predecessors(current);
@@ -1567,7 +1572,7 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
 	      }
 	    }
 	  }
-	  
+
 	  backBorder.clear();
 	  backBorder.swap(nextBackBorder);
 	  currentD2--;
@@ -1694,7 +1699,7 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
           if (boost::in_degree(n, subgraph) > 1) {
             branchcount -= boost::in_degree(n, subgraph) - 1;
           }
-	  
+
           branch[n] = branchcount;
 
           if (out_degree(n, subgraph) > 1) {
@@ -1715,7 +1720,7 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
     int lastSolid = currentD2;
 
     // Trace back in the dp matrix
-    
+
     current = reachedTarget;
     // Set of in neighbors of the current node
     std::vector<Node> back;

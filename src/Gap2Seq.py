@@ -107,7 +107,7 @@ def listener(queue, filename):
     return successful_gaps
 
 # Runs all the read filtering and gap filling for a single gap
-def fill_gap(libraries, gap, k, fuz, solid, derr, max_mem, reads=None, queue=None):
+def fill_gap(libraries, gap, k, fuz, solid, derr, max_mem, randseed, reads=None, queue=None):
     # Cleanup, just to be sure
     reads_base = 'tmp.reads.' + gap.id + '.'
     subprocess.check_call(['rm', '-f', reads_base + '*'])
@@ -167,6 +167,7 @@ def fill_gap(libraries, gap, k, fuz, solid, derr, max_mem, reads=None, queue=Non
                 '-nb-cores', '1',
                 '-dist-error', str(derr),
                 '-max-mem', str(max_mem),
+                '-randseed', str(randseed),
                 '-reads', ','.join(reads)] + gap.filler_data(),
                 stderr=f)
         except subprocess.CalledProcessError:
@@ -223,14 +224,14 @@ def parse_gap(bed, gap, id):
 
 # Starts multiple gapfilling processes in parallel
 def start_fillers(bed, gaps, libraries, queue=None, pool=None, k=31, fuz=10,
-        solid=2, derr=500, max_mem=20, reads=None):
+        solid=2, derr=500, max_mem=20, reads=None, randseed=0):
     start_filler = lambda seq, gap_id: fill_gap(libraries, parse_gap(bed, seq,
-        str(gap_id)), k, fuz, solid, derr, max_mem, reads)
+        str(gap_id)), k, fuz, solid, derr, max_mem, randseed, reads)
 
     if pool != None:
         start_filler = lambda seq, gap_id: pool.apply_async(fill_gap,
             args=([libraries, parse_gap(bed, seq, str(gap_id)), k, fuz,
-                solid, derr, max_mem, reads, queue]))
+                solid, derr, max_mem, randseed, reads, queue]))
 
     gap_id = 0
 
@@ -347,6 +348,7 @@ if __name__ == '__main__':
     parser.add_argument('--solid', type=int, default=2, help="threshold for solid k-mers for building the DBG [default 2]")
     parser.add_argument('--max-mem', type=float, default=20, help="maximum memory usage of DP table computation in gigabytes (excluding DBG) [default 20]")
     parser.add_argument('--dist-error', type=int, default=500, help="maximum error in gap estimates  [default 500]")
+    parser.add_argument('--randseed', type=int, default=0, help="Random seed (0 to use current time)  [default 0]")
 
     # Either a set of mapped read libraries or a set of fasta-formatted reads
     # Tab-separated list:
@@ -423,7 +425,8 @@ if __name__ == '__main__':
     print('Starting gapfillers')
     jobs = start_fillers(args['bed'], args['gaps'], libraries, queue=queue,
         pool=pool, k=args['k'], fuz=args['fuz'], solid=args['solid'],
-        derr=args['dist_error'], max_mem=max_mem, reads=args['reads'])
+        derr=args['dist_error'], max_mem=max_mem, reads=args['reads'],
+        randseed=args['randseed'])
 
     args['bed'].close()
     args['gaps'].close()
