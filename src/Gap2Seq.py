@@ -260,13 +260,15 @@ def start_fillers(bed, gaps, libraries, queue=None, pool=None, k=31, fuz=10,
     return jobs
 
 # Run GapCutter, i.e. cut scaffolds into contigs and gaps
-def cut_gaps(scaffolds, contigs_file = 'tmp.contigs', gap_file = 'tmp.gaps',
+def cut_gaps(k, fuz, scaffolds, contigs_file = 'tmp.contigs', gap_file = 'tmp.gaps',
         bed_file = 'tmp.bed'):
     if contigs_file != 'tmp.contigs': check_file(contigs_file)
     if gap_file != 'tmp.gaps': check_file(gap_file)
     if bed_file != 'tmp.bed': check_file(bed_file)
 
     subprocess.check_call([GAPCUTTER,
+            '-k', str(k),
+            '-fuz', str(fuz),
             '-scaffolds', scaffolds,
             '-gaps', gap_file,
             '-contigs', contigs_file,
@@ -402,7 +404,7 @@ if __name__ == '__main__':
     if args['bed'] == None or args['gaps'] == None:
         if args['scaffolds'] != None:
             print('Cutting gaps')
-            args['bed'], args['gaps'] = cut_gaps(args['scaffolds'])
+            args['bed'], args['gaps'] = cut_gaps(args['k'], args['fuz'], args['scaffolds'])
             scaffolds_cut = True
             args['final_out'] = args['filled']
             args['filled'] = 'tmp.filled'
