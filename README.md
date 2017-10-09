@@ -108,11 +108,11 @@ samtools index Data/original/shortjump.bam
 
 Create a read library configuration file, a tab-separated list with a single
 read library per line:
-bam, read length, mean insert size, std dev, threshold
+bam, mean insert size, std dev, threshold
 
 ```
-echo -e "Data/original/frag.bam\t101\t180\t18\t40" > libraries.txt
-echo -e "Data/original/shortjump.bam\t37\t3500\t350\t40" >> libraries.txt
+echo -e "Data/original/frag.bam\t180\t18\t40" > libraries.txt
+echo -e "Data/original/shortjump.bam\t3500\t350\t40" >> libraries.txt
 ```
 
 Run Gap2Seq.
@@ -141,6 +141,9 @@ When classifying filled bases into safe and unsafe bases, all paths within the
 allowed interval are now considered. In the previous version, only paths with
 optimal length were considered. The old behaviour can still be invoked using
 the parameter -best-only.
+
+ReadFilter now infers the read length. This breaks compatibility with old read
+library configurations.
 
 ### Version 3.0
 

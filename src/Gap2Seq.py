@@ -27,6 +27,7 @@ import os, sys
 import subprocess, multiprocessing
 import datetime, random
 
+# Helpers for finding executables
 script_dir = os.path.dirname(os.path.realpath(__file__))
 isexecutable = lambda f: os.path.isfile(f) and os.access(f, os.X_OK)
 def find_executable(path_hints, name):
@@ -38,6 +39,12 @@ def find_executable(path_hints, name):
     print('%s not found' % name, file=sys.stderr)
     sys.exit(1)
 
+# Helper for checking if a file already exists
+def check_file(filename):
+    if os.path.isfile(filename):
+        print('%s exists' % filename)
+        sys.exit(1)
+
 # Find required tools
 GAPMERGER = find_executable([script_dir, './', '../'], 'GapMerger')
 GAPCUTTER = find_executable([script_dir, './', '../'], 'GapCutter')
@@ -46,9 +53,9 @@ READFILTER = find_executable([script_dir, './', '../'], 'ReadFilter')
 
 # An object for holding all the data for a library of short reads
 class Library:
-    def __init__(self, bam, read_length, mean_insert_size, std_dev, threshold):
-        self.bam, self.len, self.mu,  self.sd, self.threshold = \
-            bam, read_length, mean_insert_size, std_dev, threshold
+    def __init__(self, bam, mean_insert_size, std_dev, threshold):
+        self.bam, self.mu, self.sd, self.threshold = \
+            bam, mean_insert_size, std_dev, threshold
 
         # Assert bam-file is indexed
         if not os.path.isfile(bam + '.bai'):
@@ -57,7 +64,6 @@ class Library:
 
     def data(self):
         return ['-bam', self.bam,
-            '-read-length', str(self.len),
             '-mean', str(self.mu),
             '-std-dev', str(self.sd)]
 
@@ -256,15 +262,9 @@ def start_fillers(bed, gaps, libraries, queue=None, pool=None, k=31, fuz=10,
 # Run GapCutter, i.e. cut scaffolds into contigs and gaps
 def cut_gaps(scaffolds, contigs_file = 'tmp.contigs', gap_file = 'tmp.gaps',
         bed_file = 'tmp.bed'):
-    if os.path.isfile(contigs_file):
-        print('%s exists' % contigs_file)
-        sys.exit(1)
-    if os.path.isfile(gap_file):
-        print('%s exists' % gap_file)
-        sys.exit(1)
-    if os.path.isfile(bed_file):
-        print('%s exists' % bed_file)
-        sys.exit(1)
+    if contigs_file != 'tmp.contigs': check_file(contigs_file)
+    if gap_file != 'tmp.gaps': check_file(gap_file)
+    if bed_file != 'tmp.bed': check_file(bed_file)
 
     subprocess.check_call([GAPCUTTER,
             '-scaffolds', scaffolds,
@@ -386,7 +386,7 @@ if __name__ == '__main__':
         with open(args['libraries'], 'r') as f:
             for lib in f:
                 arg = lib.split('\t')
-                libraries += [Library(arg[0], int(arg[1]), int(arg[2]), int(arg[3]), int(arg[4]))]
+                libraries += [Library(arg[0], int(arg[1]), int(arg[2]), int(arg[3]))]
 
         # Use only 1 library
         if args['index'] != -1:

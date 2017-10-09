@@ -39,7 +39,6 @@ inline u_int64_t hash1(const std::string &key, u_int64_t seed=0) {
 static const char* STR_ALIGNMENT = "-bam";
 static const char* STR_OUTPUT = "-reads";
 
-static const char* STR_READ_LENGTH = "-read-length";
 static const char* STR_MEAN = "-mean";
 static const char* STR_STD_DEV = "-std-dev";
 
@@ -193,17 +192,19 @@ public:
 };
 
 // Counts the number of reads by iterating through the alignment file
-uint64_t count_reads(const std::string &filename) {
+uint64_t count_reads(const std::string &filename, int32_t *read_length) {
   io_t io(filename);
   sam_iterator iter(io, ".");
 
   uint64_t count = 0;
+  int32_t max_length = 0;
   while (iter.next()) {
     count++;
+    max_length = max(max_length, iter.bam->core.l_qseq);
   }
 
   io.unload();
-
+  *read_length = max_length;
   return count;
 }
 
@@ -230,7 +231,6 @@ ReadFilter::ReadFilter() : Tool("ReadFilter") {
   getParser()->push_front(new OptionOneParam(STR_OUTPUT, "FASTA-formatted output file", true));
 
   // Read library parameters
-  getParser()->push_front(new OptionOneParam(STR_READ_LENGTH, "Read length", true));
   getParser()->push_front(new OptionOneParam(STR_MEAN, "Mean insert size", true));
   getParser()->push_front(new OptionOneParam(STR_STD_DEV, "Insert size standard deviation", true));
 
@@ -312,7 +312,6 @@ void ReadFilter::execute() {
   const std::string alignment = getInput()->getStr(STR_ALIGNMENT);
   const std::string output = getInput()->getStr(STR_OUTPUT);
 
-  const int read_length = static_cast<int>(getInput()->getInt(STR_READ_LENGTH));
   const int mean_insert = static_cast<int>(getInput()->getInt(STR_MEAN));
   const int std_dev = static_cast<int>(getInput()->getInt(STR_STD_DEV));
 
@@ -333,12 +332,13 @@ void ReadFilter::execute() {
     return;
   }
 
+  // Use basic Bloom filter from GATB
+  int32_t read_length = 0;
+  const uint64_t num_of_reads = count_reads(alignment, &read_length);
+  IBloom<std::string> *bloom = new BloomSynchronized<std::string>(5 * num_of_reads);
+
   // Allocate memory for string conversions
   char *buffer = new char[read_length+1];
-
-  // Use basic Bloom filter from GATB
-  const uint64_t num_of_reads = count_reads(alignment);
-  IBloom<std::string> *bloom = new BloomSynchronized<std::string>(5 * num_of_reads);
 
   // Open output file
   BankFasta reads(output);
