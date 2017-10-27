@@ -79,7 +79,7 @@ Gap2Seq::Gap2Seq() : Tool("Gap2Seq")
     getParser()->push_front (new OptionOneParam (STR_SOLID_THRESHOLD, "Threshold for solid k-mers",  false, DEFAULT_SOLID));
     getParser()->push_front (new OptionOneParam (STR_READS, "FASTA/Q files of reads. For several files use a comma separated list.",  true));
     getParser()->push_front (new OptionOneParam (STR_SCAFFOLDS, "FASTA/Q file of scaffolds",  false, ""));
-    getParser()->push_front (new OptionOneParam (STR_FILLED_SCAFFOLDS, "FASTA file of filled scaffolds",  false, ""));
+    getParser()->push_front (new OptionOneParam (STR_FILLED_SCAFFOLDS, "FASTA file of filled scaffolds",  true));
     getParser()->push_front (new OptionOneParam (STR_DIST_ERROR, "Maximum error in gap estimates",  false, DEFAULT_DIST_ERR));
     getParser()->push_front (new OptionOneParam (STR_FUZ, "Number of nucleotides to ignore on gap fringes",  false, DEFAULT_FUZ));
     getParser()->push_front (new OptionOneParam (STR_MAX_MEM, "Maximum memory usage of DP table computation in gigabytes (excluding DBG)",  false, DEFAULT_MAX_MEMORY));
@@ -164,12 +164,13 @@ void print_statistics(int filledStart, int gapStart, int gapEnd,
 /*********************************************************************
 Main method for gap filling
 *********************************************************************/
-void Gap2Seq::execute ()
+void Gap2Seq::execute()
 {
   // Get the command line arguments
   int k = getInput()->getInt(STR_KMER_LEN);
   int solid = getInput()->getInt(STR_SOLID_THRESHOLD);
   std::string reads = getInput()->getStr(STR_READS);
+  std::string filled_scaffolds = getInput()->getStr(STR_FILLED_SCAFFOLDS);
   int d_err = getInput()->getInt(STR_DIST_ERROR);
   int max_fuz = getInput()->getInt(STR_FUZ);
   long long max_mem = (long long)(getInput()->getDouble(STR_MAX_MEM) * 1024*1024*1024);
@@ -180,13 +181,13 @@ void Gap2Seq::execute ()
   int randseed = getInput()->getInt(STR_RANDOM_SEED);
 
   // Initialize random number generation for choosing random paths
-  srand((randseed > 0) ? ((unsigned int) randseed) : ((unsigned int )time(NULL)));
+  srand((randseed > 0) ? ((unsigned int) randseed) : ((unsigned int) time(NULL)));
 
   std::cout << "k-mer size: " << k << std::endl;
   std::cout << "Solidity threshold: " << solid << std::endl;
   std::cout << "Reads file: " << reads << std::endl;
   // std::cout << "Scaffolds file: " << scaffolds << std::endl;
-  // std::cout << "Filled scaffolds file: " << filled_scaffolds << std::endl;
+  std::cout << "Filled scaffolds file: " << filled_scaffolds << std::endl;
   std::cout << "Distance error: " << d_err << std::endl;
   std::cout << "Max Fuz: " << max_fuz << std::endl;
   std::cout << "Max memory: " << max_mem << std::endl;
@@ -225,6 +226,9 @@ void Gap2Seq::execute ()
 
   std::cout << graph.getInfo() << std::endl;
 
+  // Open the output scaffold file
+  BankFasta output(filled_scaffolds);
+
   // Fill a single gap
   if (getParser()->saw(STR_LEFT) && getParser()->saw(STR_RIGHT) && getParser()->saw(STR_LENGTH)) {
     const std::string left_flank = getInput()->getStr(STR_LEFT);
@@ -257,16 +261,28 @@ void Gap2Seq::execute ()
 
     // Print the statistics on the filled gap
     int filledStart = left_flank.length() - left_max_fuz-left_fuz;
-    print_statistics(filledStart, left_flank.length(), left_flank.length()+length, num_of_paths, buf,
-      k, left_max_fuz, right_max_fuz, left_fuz, right_fuz,
-      skip_confident, unique_paths, substats, length, "");
+    print_statistics(filledStart, left_flank.length(),
+      left_flank.length()+length, num_of_paths, buf, k, left_max_fuz,
+      right_max_fuz, left_fuz, right_fuz, skip_confident, unique_paths,
+      substats, length, "");
+
+    std::string filledSeq;
 
     // At least one path found
     if (num_of_paths > 0 && (!unique_paths || num_of_paths == 1)) {
-      // Remove ignored edges from flanks, insert filled sequence and output
-      std::cout << left_flank.substr(0, left_flank.length()-left_fuz) << &buf[left_max_fuz-left_fuz] << std::endl;
+      // Remove ignored edges from flanks, insert filled sequence
+      filledSeq = left_flank.substr(0, left_flank.length()-left_fuz) + &buf[left_max_fuz-left_fuz];
+    } else {
+      filledSeq = buf;
     }
 
+    // Write the filled scaffold to file
+    Sequence s((char *) filledSeq.c_str());
+    s._comment = "";
+    output.insert(s);
+    output.flush();
+
+    delete[] buf;
     return;
   }
 
@@ -274,10 +290,6 @@ void Gap2Seq::execute ()
   std::string scaffolds = getInput()->getStr(STR_SCAFFOLDS);
   BankFasta scaffoldBank(scaffolds);
   BankFasta::Iterator itSeq(scaffoldBank);
-
-  // Open the output scaffold file
-  std::string filled_scaffolds = getInput()->getStr(STR_FILLED_SCAFFOLDS);
-  BankFasta output(filled_scaffolds);
 
   // Count gaps and filled gaps
   int gapcount = 0;
@@ -297,7 +309,7 @@ void Gap2Seq::execute ()
 
   // Parallel code starts here
 #ifdef SINGLE_THREAD
-  for(itSeq.first(); !itSeq.isDone();itSeq.next()) {
+  for (itSeq.first(); !itSeq.isDone(); itSeq.next()) {
     // Original sequence
     std::string seq = itSeq->toString();
     std::string comment = itSeq->getComment();
@@ -314,12 +326,12 @@ void Gap2Seq::execute ()
     {
       LocalSynchronizer local(global_lock);
       if (!itSeq.isDone()) {
-	seq = itSeq->toString();
-	comment = itSeq->getComment();
-	itSeq.next();
-	more = true;
+        seq = itSeq->toString();
+        comment = itSeq->getComment();
+        itSeq.next();
+        more = true;
       } else {
-	more = false;
+        more = false;
       }
     }
     if (!more)

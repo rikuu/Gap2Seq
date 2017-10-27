@@ -160,7 +160,7 @@ def fill_gap(libraries, gap, k, fuz, solid, derr, max_mem, randseed,
                         reads.append(os.path.abspath(reads_file))
 
     # Run Gap2Seq on the gap with the filtered reads
-    log = b''
+    log, filled = b'', 'tmp.filled.' + gap.id
     with open('tmp.gap2seq.' + gap.id + '.log', 'w') as f:
         wd = os.getcwd()
         wd_new = os.path.join(wd, 'tmp.' + str(random.randrange(1000, 9999)) + '.' + gap.id)
@@ -177,7 +177,8 @@ def fill_gap(libraries, gap, k, fuz, solid, derr, max_mem, randseed,
                 '-dist-error', str(derr),
                 '-max-mem', str(max_mem),
                 '-randseed', str(randseed),
-                '-reads', ','.join(reads)] + binary_options + gap.filler_data(),
+                '-reads', ','.join(reads)
+                '-filled', os.path.join(wd, filled)] + binary_options + gap.filler_data(),
                 stderr=f)
         except subprocess.CalledProcessError:
             log = b''
@@ -185,34 +186,29 @@ def fill_gap(libraries, gap, k, fuz, solid, derr, max_mem, randseed,
         os.chdir(wd)
         subprocess.check_call(['rm', '-rf', wd_new])
 
-    # Gap2Seq output:
-    #  143 lines of graph information
-    #  1-2 lines of gap information
-    #  Filled sequence
-    #  'Gap2Seq'
-
-    filled = False
-    fill = log.split(b'\n')
-    if len(fill) > 148:
-        filled = True
-        fill = fill[-3].decode()
-    else:
-        fill = gap.left + ('N' * gap.length) + gap.right
-
-    # Cleanup reads
-    if filtered:
-        subprocess.check_call(['rm', '-f'] + reads)
-
-    # Remove logs and temporary/intermediate files unless Gap2Seq errored
+    # Parse filled scaffold
+    fill = ''
     if log != b'':
+        with open(filled, 'r') as f:
+            for line in f:
+                if line[0] != '>':
+                    fill += line.rstrip()
+
+        # Remove logs and temporary/intermediate files
         subprocess.check_call(['rm', '-f',
+            'tmp.filled.' + gap.id,
             'tmp.extract.' + gap.id + '.log',
             'tmp.gap2seq.' + gap.id + '.log'])
 
+    # Cleanup reads
+    if filtered:
+        subprocess.check_call(['rm', '-f', reads_base + '*'])
+
+    successful = not 'N' in fill and not 'n' in fill
     if queue != None:
-        queue.put((filled, gap.comment, fill))
+        queue.put((successful, gap.comment, fill))
     else:
-        return (filled, gap.comment, fill)
+        return (successful, gap.comment, fill)
 
 # NOTE: Assumes gaps and the bed file are in the same order
 def parse_gap(bed, gap, id):
