@@ -57,10 +57,15 @@ class Library:
         self.bam, self.mu, self.sd, self.threshold = \
             bam, mean_insert_size, std_dev, threshold
 
-        # Assert bam-file is indexed
+        # Check bam is indexed
         if not os.path.isfile(bam + '.bai'):
             print('%s.bai not found' % bam, file=sys.stderr)
             sys.exit(1)
+
+    def filter_unmapped(self, filename):
+        # Filter unmapped reads for thresholding later
+        subprocess.check_call([READFILTER, '-unmapped-only',
+            '-reads', filename] + self.data())
 
     def data(self):
         return ['-bam', self.bam,
@@ -122,10 +127,10 @@ def fill_gap(libraries, gap, k, fuz, solid, derr, max_mem, randseed,
     # TODO: Get a more accurate value?
     flank_length = str(k + fuz)
 
-    # Extract reads
-    extracted = False
+    # Filter reads
+    filtered = False
     if reads == None:
-        extracted = True
+        filtered = True
         reads = []
         with open('tmp.extract.' + gap.id + '.log', 'w') as f:
             filtered_length = 0
@@ -136,12 +141,13 @@ def fill_gap(libraries, gap, k, fuz, solid, derr, max_mem, randseed,
                     '-flank-length', flank_length] + \
                     gap.data() + lib.data(), stderr=f, stdout=f)
 
-                # If no reads are extracted, no file exists
+                # If no reads are filtered, no file exists
                 if not os.path.isfile(reads_file):
                     continue
 
                 reads.append(os.path.abspath(reads_file))
 
+                # Count the number of filtered bases
                 grep = subprocess.check_output('grep \'^[^>;]\' ' + reads_file + ' | wc -c', shell=True)
                 filtered_length += int(grep)
 
@@ -149,12 +155,7 @@ def fill_gap(libraries, gap, k, fuz, solid, derr, max_mem, randseed,
             threshold = sum([lib.threshold for lib in libraries])
             if (filtered_length / gap.length) < threshold:
                 for i, lib in enumerate(libraries):
-                    reads_file = reads_base + str(i) + '.unmapped'
-                    subprocess.check_call([READFILTER,
-                        '-unmapped-only',
-                        '-reads', reads_file] + gap.data() + lib.data(),
-                        stderr=f, stdout=f)
-
+                    reads_file = 'tmp.reads.' + str(i) + '.unmapped'
                     if os.path.isfile(reads_file):
                         reads.append(os.path.abspath(reads_file))
 
@@ -182,7 +183,7 @@ def fill_gap(libraries, gap, k, fuz, solid, derr, max_mem, randseed,
             log = b''
 
         os.chdir(wd)
-        subprocess.check_call(['rm', '-r', wd_new])
+        subprocess.check_call(['rm', '-rf', wd_new])
 
     # Gap2Seq output:
     #  143 lines of graph information
@@ -199,13 +200,14 @@ def fill_gap(libraries, gap, k, fuz, solid, derr, max_mem, randseed,
         fill = gap.left + ('N' * gap.length) + gap.right
 
     # Cleanup reads
-    if extracted:
+    if filtered:
         subprocess.check_call(['rm', '-f'] + reads)
 
-    # Remove logs and temporary/intermediate files
-    subprocess.check_call(['rm', '-f',
-        'tmp.extract.' + gap.id + '.log',
-        'tmp.gap2seq.' + gap.id + '.log'])
+    # Remove logs and temporary/intermediate files unless Gap2Seq errored
+    if log != b'':
+        subprocess.check_call(['rm', '-f',
+            'tmp.extract.' + gap.id + '.log',
+            'tmp.gap2seq.' + gap.id + '.log'])
 
     if queue != None:
         queue.put((filled, gap.comment, fill))
@@ -395,6 +397,10 @@ if __name__ == '__main__':
         # Use only 1 library
         if args['index'] != -1:
             libraries = [libraries[args['index']]]
+
+        # Filter unmapped reads
+        for i, lib in enumerate(libraries):
+            lib.unmapped('tmp.reads.' + i + '.unmapped')
     elif args['reads'] != None:
         args['reads'] = args['reads'].split(',')
     else:
