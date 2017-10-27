@@ -236,14 +236,11 @@ ReadFilter::ReadFilter() : Tool("ReadFilter") {
 
   // Gap parameters
   getParser()->push_front(new OptionOneParam(STR_SCAFFOLD, "Scaffold name", true));
-  getParser()->push_front(new OptionOneParam(STR_GAP_BREAKPOINT, "Gap position", true));
-
+  getParser()->push_front(new OptionOneParam(STR_GAP_BREAKPOINT, "Gap breakpoint position", true));
+  getParser()->push_front(new OptionOneParam(STR_GAP_LENGTH, "Gap length (in the scaffold)", false, "-1"));
   getParser()->push_front(new OptionOneParam(STR_FLANK_LENGTH , "Flank length", false, "-1"));
 
-  getParser()->push_front(new OptionOneParam(STR_GAP_LENGTH, "Gap length", false, "-1"));
-  getParser()->push_front(new OptionOneParam(STR_THRESHOLD, "Threshold for using unmapped reads", false, "-1"));
-
-  getParser()->push_front(new OptionNoParam(STR_ONLY_UNMAPPED, "Only output unmapped reads"));
+  getParser()->push_front(new OptionNoParam(STR_ONLY_UNMAPPED, "Output unmapped reads"));
 }
 
 /*****************************************************************************/
@@ -317,11 +314,8 @@ void ReadFilter::execute() {
 
   const std::string scaffold = getInput()->getStr(STR_SCAFFOLD);
   const int breakpoint = static_cast<int>(getInput()->getInt(STR_GAP_BREAKPOINT));
-
   const int flank_length = static_cast<int>(getInput()->getInt(STR_FLANK_LENGTH));
-
   const int gap_length = static_cast<int>(getInput()->getInt(STR_GAP_LENGTH));
-  const int threshold = static_cast<int>(getInput()->getInt(STR_THRESHOLD));
 
   const bool unmapped_only = getParser()->saw(STR_ONLY_UNMAPPED);
 
@@ -354,8 +348,8 @@ void ReadFilter::execute() {
     process_mates(io, tid, left_start, left_end, bloom);
 
     // Extract pairs from the right mappings
-    const int right_start = breakpoint + (mean_insert + 3*std_dev + read_length);
-    const int right_end = breakpoint + (mean_insert - 3*std_dev + read_length);
+    const int right_start = breakpoint + (mean_insert + 3*std_dev + read_length) + gap_length;
+    const int right_end = breakpoint + (mean_insert - 3*std_dev + read_length) + gap_length;
     process_mates(io, tid, right_start, right_end, bloom);
 
     // Output reads and count length
@@ -364,13 +358,13 @@ void ReadFilter::execute() {
     // Output overlapping reads
     if (flank_length != -1) {
       const int start = breakpoint - flank_length;
-      const int end = breakpoint + flank_length;
+      const int end = breakpoint + flank_length + gap_length;
       process_region(io, tid, start, end, buffer, bloom, &reads, &seqlen, &reads_extracted);
     }
   }
 
   // Output unmapped reads
-  if (unmapped_only || ((gap_length != -1 && threshold != -1) && ((seqlen / gap_length) < threshold))) {
+  if (unmapped_only) {
     process_unmapped(io, buffer, bloom, &reads, &reads_extracted);
   }
 

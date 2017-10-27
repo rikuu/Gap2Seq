@@ -73,20 +73,27 @@ class Library:
             '-std-dev', str(self.sd)]
 
 class Gap:
-    def __init__(self, scaffold, position, length, left, right, comment, id):
+    def __init__(self, scaffold, position, gap_length, flank_length,
+            left, right, comment, id, insertion):
         self.scaffold, self.position = scaffold, position
-        self.left, self.right, self.length = left, right, length
-        self.comment, self.id = comment, id
+        self.left, self.right, self.gap_length = left, right, gap_length
+        self.flank_length, self.comment, self.id = flank_length, comment, id
+        self.insertion = insertion
 
     def data(self):
+        length = str(self.gap_length)
+        if self.insertion:
+            length = '0'
+
         return ['-scaffold', str(self.scaffold),
             '-breakpoint', str(self.position),
-            '-gap-length', str(self.length)]
+            '-flank-length', str(self.flank_length)
+            '-gap-length', length]
 
     def filler_data(self):
         return ['-left', self.left,
             '-right', self.right,
-            '-length', str(self.length)]
+            '-length', str(self.gap_length)]
 
 # Listener for filled gaps, to print progress
 successful_gaps, filled_gaps, num_of_gaps = 0, 0, 1
@@ -124,9 +131,6 @@ def fill_gap(libraries, gap, k, fuz, solid, derr, max_mem, randseed,
     reads_base = 'tmp.reads.' + gap.id + '.'
     subprocess.check_call(['rm', '-f', reads_base + '*'])
 
-    # TODO: Get a more accurate value?
-    flank_length = str(k + fuz)
-
     # Filter reads
     filtered = False
     if reads == None:
@@ -137,8 +141,7 @@ def fill_gap(libraries, gap, k, fuz, solid, derr, max_mem, randseed,
             for i, lib in enumerate(libraries):
                 reads_file = reads_base + str(i)
                 subprocess.check_call([READFILTER,
-                    '-reads', reads_file,
-                    '-flank-length', flank_length] + \
+                    '-reads', reads_file] + \
                     gap.data() + lib.data(), stderr=f, stdout=f)
 
                 # If no reads are filtered, no file exists
@@ -204,14 +207,14 @@ def fill_gap(libraries, gap, k, fuz, solid, derr, max_mem, randseed,
     if filtered:
         subprocess.check_call(['rm', '-f', reads_base + '*'])
 
-    successful = not 'N' in fill and not 'n' in fill
+    successful = (not 'N' in fill) and (not 'n' in fill)
     if queue != None:
         queue.put((successful, gap.comment, fill))
     else:
         return (successful, gap.comment, fill)
 
 # NOTE: Assumes gaps and the bed file are in the same order
-def parse_gap(bed, gap, id):
+def parse_gap(bed, gap, id, insertion=False):
     gap = gap.split('\n')
     comment = gap[0]
 
@@ -219,27 +222,28 @@ def parse_gap(bed, gap, id):
 
     left = gap[:gap.upper().find('N')]
     right = gap[gap.upper().rfind('N')+1:]
-    length = len(gap) - len(left) - len(right)
+    flank_length = min(len(left), len(right))
+    gap_length = len(gap) - len(left) - len(right)
 
     # Parse gap data from bed file
     gap_data = bed.readline().rstrip().split('\t')
     scaffold = gap_data[0]
     position = int(gap_data[1]) + len(left)
 
-    return Gap(scaffold, position, length, left, right, comment, id)
+    return Gap(scaffold, position, gap_length, flank_length, left, right, comment, id, insertion)
 
 # Starts multiple gapfilling processes in parallel
 def start_fillers(bed, gaps, libraries, queue=None, pool=None, k=31, fuz=10,
         solid=2, derr=500, max_mem=20, reads=None, randseed=0, upper=False,
-        unique=False, best=False):
+        unique=False, best=False, insertion=False):
     start_filler = lambda seq, gap_id: fill_gap(libraries, parse_gap(bed, seq,
-        str(gap_id)), k, fuz, solid, derr, max_mem, randseed, upper, unique,
-        best, reads)
+        str(gap_id), insertion), k, fuz, solid, derr, max_mem, randseed, upper,
+        unique, best, reads)
 
     if pool != None:
         start_filler = lambda seq, gap_id: pool.apply_async(fill_gap,
-            args=([libraries, parse_gap(bed, seq, str(gap_id)), k, fuz,
-                solid, derr, max_mem, randseed, upper, unique, best,
+            args=([libraries, parse_gap(bed, seq, str(gap_id), insertion), k,
+                fuz, solid, derr, max_mem, randseed, upper, unique, best,
                 reads, queue]))
 
     gap_id = 0
@@ -347,6 +351,7 @@ if __name__ == '__main__':
     # filler.py specific arguments
     parser.add_argument('-f', '--filled', required=True, type=str, help="output file for filled scaffolds")
     parser.add_argument('-t', '--threads', type=int, default=1, help="number of threads to use")
+    parser.add_argument('--insertion', action='store_true', help=argparse.SUPPRESS)
 
     # Gap2Seq specific arguments
     parser.add_argument('-k', type=int, default=31, help="k-mer length for DBG  [default 31]")
@@ -415,6 +420,7 @@ if __name__ == '__main__':
         elif args['vcf'] != None:
             print('Parsing VCF')
             args['bed'], args['gaps'] = cut_vcf(args['vcf'], args['reference'], args['k'], args['fuz'])
+            args['insertion'] = True
         else:
             parser.print_help()
             print('Either [-s/--scaffolds], [-b/--bed and -g/--gaps], or [-v/--vcf and -R/--reference] are required.')
@@ -441,7 +447,8 @@ if __name__ == '__main__':
         pool=pool, k=args['k'], fuz=args['fuz'], solid=args['solid'],
         derr=args['dist_error'], max_mem=max_mem, reads=args['reads'],
         randseed=args['randseed'], upper=args['all_upper'],
-        unique=args['unique'], best=args['best_only'])
+        unique=args['unique'], best=args['best_only'],
+        insertion=args['insertion'])
 
     args['bed'].close()
     args['gaps'].close()
