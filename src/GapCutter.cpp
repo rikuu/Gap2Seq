@@ -20,10 +20,7 @@
 *****************************************************************************/
 
 #include <string>
-#include <map>
 #include <fstream>
-#include <unordered_map>
-#include <unordered_set>
 
 #include <gatb/gatb_core.hpp>
 
@@ -32,6 +29,7 @@
 // Default parameter values
 #define DEFAULT_K "31"
 #define DEFAULT_FUZ "10"
+#define DEFAULT_MASK false
 
 /****************************************************************************/
 
@@ -42,10 +40,7 @@ static const char* STR_CONTIGS = "-contigs";
 static const char* STR_GAPS = "-gaps";
 static const char* STR_FUZ = "-fuz";
 static const char* STR_BED = "-bed";
-
 static const char* STR_MASK = "-mask";
-static const char* STR_SPLIT = "-split";
-static const char* STR_SHORT = "-short";
 
 /****************************************************************************/
 
@@ -58,12 +53,8 @@ static const char* STR_SPLIT_MARKER = " split ";
 class GapCutter : public Tool
 {
 public:
-
-    // Constructor
-    GapCutter ();
-
-    // Actual job done by the tool is here
-    void execute ();
+    GapCutter();
+    void execute();
 
     void insertSequence(BankFasta &, const std::string &,
       const std::string &) const;
@@ -77,19 +68,15 @@ public:
 Constructor for the tool.
 *****************************************************************************/
 
-GapCutter::GapCutter ()  : Tool ("GapCutter")
+GapCutter::GapCutter() : Tool("GapCutter")
 {
-    // We add some custom arguments for command line interface
     getParser()->push_front (new OptionOneParam (STR_SCAFFOLDS, "FASTA/Q file of scaffolds",  true));
     getParser()->push_front (new OptionOneParam (STR_CONTIGS, "FASTA file of contigs",  true));
     getParser()->push_front (new OptionOneParam (STR_GAPS, "FASTA file of gaps",  true));
     getParser()->push_front (new OptionOneParam (STR_BED, "BED file for gaps", true));
     getParser()->push_front (new OptionOneParam (STR_FUZ, "Maximum number of nucleotides to ignore on gap fringes",  false, DEFAULT_FUZ));
-    getParser()->push_front (new OptionOneParam (STR_KMER_LEN, "kmer length",  false, DEFAULT_K));
-
-    getParser()->push_front (new OptionNoParam (STR_MASK, "Mask sequences too short to use",  false, false));
-    getParser()->push_front (new OptionNoParam (STR_SPLIT, "Re-use flanks too short to split",  false, false));
-    getParser()->push_front (new OptionNoParam (STR_SHORT, "Output flanks less than k+fuz",  false, false));
+    getParser()->push_front (new OptionOneParam (STR_KMER_LEN, "k-mer length",  false, DEFAULT_K));
+    getParser()->push_front (new OptionNoParam (STR_MASK, "Mask sequences too short to use",  false, DEFAULT_MASK));
 }
 
 void GapCutter::insertSequence(BankFasta &bank, const std::string &comment,
@@ -128,19 +115,15 @@ size_t GapCutter::gapLength(const std::string &seq, const size_t start) const
   return gapLength;
 }
 
-void GapCutter::execute ()
+void GapCutter::execute()
 {
-  // Get the command line arguments
   const std::string scaffoldsFilename = getInput()->getStr(STR_SCAFFOLDS);
   const std::string contigsFilename = getInput()->getStr(STR_CONTIGS);
   const std::string gapsFilename = getInput()->getStr(STR_GAPS);
   const std::string bedFilename = getInput()->getStr(STR_BED);
   const size_t k = (size_t) getInput()->getInt(STR_KMER_LEN);
   const size_t fuz = (size_t) getInput()->getInt(STR_FUZ);
-
   const bool mask = (getInput()->get(STR_MASK) != 0);
-  const bool split = (getInput()->get(STR_SPLIT) != 0);
-  const bool nonstatic = (getInput()->get(STR_SHORT) != 0);
 
   std::cout << "Scaffolds file: " << scaffoldsFilename << std::endl;
   std::cout << "Contigs file: " << contigsFilename << std::endl;
@@ -282,34 +265,41 @@ void GapCutter::execute ()
         continue;
       }
 
-      const size_t flank2 = std::min(dn, k+fuz);
-
       // Mask everything between flanks as a gap
-      char *buffer = new char[lsum+1];
-      for (size_t j = 0; j < lsum; j++) {
-        buffer[j] = 'n';
+      if (mask) {
+        char *buffer = new char[lsum+1];
+        for (size_t j = 0; j < lsum; j++) {
+          buffer[j] = 'n';
+        }
+        buffer[lsum] = '\0';
+
+        const size_t flank2 = std::min(dn, k+fuz);
+
+        const std::string gapComment = comment + STR_GAP_MARKER + std::to_string(gap);
+        insertSequence(gapBank, gapComment, seq.substr(i + d1 - flank1, flank1) + std::string(buffer) + seq.substr(i + d1 + lsum, flank2));
+        insertSequence(contigBank, gapComment, seq.substr(i, d1 - flank1));
+
+        bedFile << contigName << "\t" << i + d1 - flank1 << "\t" << i + d1 + lsum + flank2 << std::endl;
+
+        delete[] buffer;
+
+        #ifdef DEBUG
+          std::cout << "Case3: " << comment <<
+            " d1: " << d1 << " d2: " << d2 << " d3: " << d3 <<
+            " l1: " << l1 << " l2: " << l2 << " lsum: " << lsum <<
+            " flank1: " << flank1 << " flank2: " << flank2 << std::endl;
+        #endif
+
+        gap++;
+        contig++;
+
+        i += d1 + lsum + flank2;
+      } else {
+        insertSequence(contigBank, gapComment, seq.substr(i, d1 + lsum));
+
+        contig++;
+        i += d1 + lsum;
       }
-      buffer[lsum] = '\0';
-
-      const std::string gapComment = comment + STR_GAP_MARKER + std::to_string(gap);
-      insertSequence(gapBank, gapComment, seq.substr(i + d1 - flank1, flank1) + std::string(buffer) + seq.substr(i + d1 + lsum, flank2));
-      insertSequence(contigBank, gapComment, seq.substr(i, d1 - flank1));
-
-      bedFile << contigName << "\t" << i + d1 - flank1 << "\t" << i + d1 + lsum + flank2 << std::endl;
-
-      delete[] buffer;
-
-      #ifdef DEBUG
-        std::cout << "Case3: " << comment <<
-          " d1: " << d1 << " d2: " << d2 << " d3: " << d3 <<
-          " l1: " << l1 << " l2: " << l2 << " lsum: " << lsum <<
-          " flank1: " << flank1 << " flank2: " << flank2 << std::endl;
-      #endif
-
-      gap++;
-      contig++;
-
-      i += d1 + lsum + flank2;
     }
 
     gapBank.flush();
@@ -324,17 +314,13 @@ void GapCutter::execute ()
 
 /****************************************************************************/
 
-int main (int argc, char* argv[])
+int main(int argc, char* argv[])
 {
-    try
-    {
-        // We run the tool with the provided command line arguments.
-        GapCutter().run (argc, argv);
-    }
-    catch (Exception& e)
-    {
-        std::cout << "EXCEPTION: " << e.getMessage() << std::endl;
-        return EXIT_FAILURE;
+    try {
+      GapCutter().run(argc, argv);
+    } catch (Exception& e) {
+      std::cout << "EXCEPTION: " << e.getMessage() << std::endl;
+      return EXIT_FAILURE;
     }
 
     return EXIT_SUCCESS;

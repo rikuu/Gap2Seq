@@ -19,10 +19,8 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 *****************************************************************************/
 
-#include <map>
+#include <string>
 #include <fstream>
-#include <unordered_map>
-#include <unordered_set>
 
 #include <gatb/gatb_core.hpp>
 
@@ -48,12 +46,8 @@ static const size_t SPLIT_MARKER_LENGTH = 7u;
 class GapMerger : public Tool
 {
 public:
-
-    // Constructor
-    GapMerger ();
-
-    // Actual job done by the tool is here
-    void execute ();
+    GapMerger();
+    void execute();
 
     int parseGapIndex(const std::string &) const;
     int parseScaffoldIndex(const std::string &) const;
@@ -67,9 +61,8 @@ public:
 Constructor for the tool.
 *****************************************************************************/
 
-GapMerger::GapMerger ()  : Tool ("GapMerger")
+GapMerger::GapMerger() : Tool("GapMerger")
 {
-    // We add some custom arguments for command line interface
     getParser()->push_front (new OptionOneParam (STR_SCAFFOLDS, "FASTA file of merged scaffolds",  true));
     getParser()->push_front (new OptionOneParam (STR_CONTIGS, "FASTA file of contigs",  true));
     getParser()->push_front (new OptionOneParam (STR_GAPS, "FASTA file of filled gaps",  true));
@@ -122,9 +115,8 @@ void GapMerger::insertSequence(BankFasta &bank, const std::string &comment,
   bank.insert(seq);
 }
 
-void GapMerger::execute ()
+void GapMerger::execute()
 {
-  // Get the command line arguments
   const std::string scaffoldsFilename = getInput()->getStr(STR_SCAFFOLDS);
   const std::string contigsFilename = getInput()->getStr(STR_CONTIGS);
   const std::string gapsFilename = getInput()->getStr(STR_GAPS);
@@ -191,7 +183,6 @@ void GapMerger::execute ()
           gaps++;
 
           // Combine split gaps
-          // TODO: Refactor this
           const size_t marker_pos = gapIter->getComment().find(STR_SPLIT_MARKER);
           if (marker_pos == std::string::npos) {
             first = gapIter->toString();
@@ -235,13 +226,9 @@ void GapMerger::execute ()
 
 int main (int argc, char* argv[])
 {
-    try
-    {
-        // We run the tool with the provided command line arguments.
+    try {
         GapMerger().run (argc, argv);
-    }
-    catch (Exception& e)
-    {
+    } catch (Exception& e) {
         std::cout << "EXCEPTION: " << e.getMessage() << std::endl;
         return EXIT_FAILURE;
     }

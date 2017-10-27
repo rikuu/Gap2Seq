@@ -21,8 +21,8 @@ ONE 12(9): e0184608.](https://doi.org/10.1371/journal.pone.0184608)
 ## Requirements
 
 Gap2Seq has been tested on systems running Linux on a X86_64 architecture.
-Gap2Seq uses GATB library (http://gatb-core.gforge.inria.fr/index.html) for the
-de Bruijn graph implementation and htslib (http://www.htslib.org) for reading
+Gap2Seq uses [GATB library](http://gatb-core.gforge.inria.fr/index.html) for the
+de Bruijn graph implementation and [htslib](http://www.htslib.org) for reading
 alignments for read filtering. The libraries are included in the Gap2Seq
 package.
 
@@ -48,18 +48,22 @@ Gap2Seq [parameters]
 
 Required parameters:
 -f, --filled <FASTA file>   output file for filled scaffolds
+
 -r, --reads <FASTA/Q files> short reads, several files can be specified as a list separated by ','
+or
+-l, --libraries <lib conf>  list of aligned read libraries
 
--s, --scaffolds <FASTA/Q file>
-
--g, --gaps <FASTA/Q file>
+-s, --scaffolds <FASTA/Q file> scaffolds with gaps
+or
+-g, --gaps <FASTA/Q file>   pre-cut gaps
 -b, --bed <BED file>
+or
+-v, --vcf <VCF file>        variants in the reads against reference
+-R, --reference <FASTA file>
 
 Optional parameters:
--l, --libraries <lib conf>   
-
 -t, --threads <int>         number of threads to use  [default 1]
--k <int>                    kmer length for DBG  [default 31]
+-k <int>                    k-mer length for DBG  [default 31]
 --max-mem <float>           maximum memory usage of DP table computation in gigabytes (excluding DBG) [default 20]
 --fuz <int>                 number of nucleotides to ignore on gap fringes  [default 10]
 --dist-error <int>          maximum error in gap estimates  [default 500]

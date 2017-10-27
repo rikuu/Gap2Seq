@@ -260,24 +260,25 @@ def start_fillers(bed, gaps, libraries, queue=None, pool=None, k=31, fuz=10,
     return jobs
 
 # Run GapCutter, i.e. cut scaffolds into contigs and gaps
-def cut_gaps(k, fuz, scaffolds, contigs_file = 'tmp.contigs', gap_file = 'tmp.gaps',
-        bed_file = 'tmp.bed'):
+def cut_gaps(k, fuz, mask, scaffolds, contigs_file = 'tmp.contigs',
+        gap_file = 'tmp.gaps', bed_file = 'tmp.bed'):
     if contigs_file != 'tmp.contigs': check_file(contigs_file)
     if gap_file != 'tmp.gaps': check_file(gap_file)
     if bed_file != 'tmp.bed': check_file(bed_file)
 
+    binary_options = [option for option, on in [('-mask', mask)] if on]
     subprocess.check_call([GAPCUTTER,
             '-k', str(k),
             '-fuz', str(fuz),
             '-scaffolds', scaffolds,
             '-gaps', gap_file,
             '-contigs', contigs_file,
-            '-bed', bed_file],
+            '-bed', bed_file] + binary_options,
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     return open(bed_file, 'r'), open(gap_file, 'r')
 
-# Run GAPMERGER, i.e. merge contigs and filled gaps back into scaffolds
+# Run GapMerger, i.e. merge contigs and filled gaps back into scaffolds
 def merge_gaps(filled, merged, contigs_file='tmp.contigs'):
     subprocess.check_call([GAPMERGER,
             '-scaffolds', merged,
@@ -350,7 +351,7 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--threads', type=int, default=1, help="number of threads to use")
 
     # Gap2Seq specific arguments
-    parser.add_argument('-k', type=int, default=31, help="kmer length for DBG  [default 31]")
+    parser.add_argument('-k', type=int, default=31, help="k-mer length for DBG  [default 31]")
     parser.add_argument('--fuz', type=int, default=10, help="number of nucleotides to ignore on gap fringes  [default 10]")
     parser.add_argument('--solid', type=int, default=2, help="threshold for solid k-mers for building the DBG [default 2]")
     parser.add_argument('--max-mem', type=float, default=20, help="maximum memory usage of DP table computation in gigabytes (excluding DBG) [default 20]")
@@ -359,25 +360,26 @@ if __name__ == '__main__':
     parser.add_argument('--all-upper', action='store_true', help="fill all bases in upper case.")
     parser.add_argument('--unique', action='store_true', help="fill only gaps with a unique path of best length")
     parser.add_argument('--best-only', action='store_true', help="consider only paths that have optimal length")
+    parser.add_argument('--mask', action='store_true', help=argparse.SUPPRESS)
 
-    # Either a set of mapped read libraries or a set of fasta-formatted reads
-    # Tab-separated list:
-    # bam, read_length, mean_insert_size, std_dev, threshold
-    parser.add_argument('-l', '--libraries', type=str, help="List of aligned read libraries")
-    parser.add_argument('-i', '--index', type=int, default=-1, help=argparse.SUPPRESS)
-
+    # Reads can be given in either a set of fasta-formatted reads
     parser.add_argument('-r', '--reads', type=str, help="short reads")
+
+    # or a set of aligned read libraries
+    # Tab-separated list: bam, mean_insert_size, std_dev, threshold
+    parser.add_argument('-l', '--libraries', type=str, help="list of aligned read libraries")
+    parser.add_argument('-i', '--index', type=int, default=-1, help=argparse.SUPPRESS)
 
     # One of three options is required for gap data:
     # 1. Cut gaps and bed from some scaffolds
-    parser.add_argument('-s', '--scaffolds', type=str, help="")
+    parser.add_argument('-s', '--scaffolds', type=str, help="scaffolds with gaps")
 
     # 2. Use pre-cut gaps and bed
-    parser.add_argument('-b', '--bed', type=argparse.FileType('r'), help="")
+    parser.add_argument('-b', '--bed', type=argparse.FileType('r'), help="pre-cut gaps")
     parser.add_argument('-g', '--gaps', type=argparse.FileType('r'), help="")
 
     # 3. Generate gaps and bed from VCF
-    parser.add_argument('-v', '--vcf', type=argparse.FileType('r'), help="")
+    parser.add_argument('-v', '--vcf', type=argparse.FileType('r'), help="variants in reads against reference")
     parser.add_argument('-R', '--reference', type=argparse.FileType('r'), help="")
 
     args = vars(parser.parse_args())
@@ -404,7 +406,7 @@ if __name__ == '__main__':
     if args['bed'] == None or args['gaps'] == None:
         if args['scaffolds'] != None:
             print('Cutting gaps')
-            args['bed'], args['gaps'] = cut_gaps(args['k'], args['fuz'], args['scaffolds'])
+            args['bed'], args['gaps'] = cut_gaps(args['k'], args['fuz'], args['mask'], args['scaffolds'])
             scaffolds_cut = True
             args['final_out'] = args['filled']
             args['filled'] = 'tmp.filled'
@@ -446,7 +448,7 @@ if __name__ == '__main__':
         for job in jobs:
             job.get()
         queue.put('kill')
-        successful_gaps=res.get(timeout=1)
+        successful_gaps = res.get(timeout=1)
         pool.close()
         pool.join()
 
