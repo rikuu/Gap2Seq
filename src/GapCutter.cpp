@@ -152,6 +152,7 @@ void GapCutter::execute()
   for (itSeq.first(); !itSeq.isDone(); itSeq.next()) {
     const std::string seq = itSeq->toString();
     const std::string comment = itSeq->getComment() + STR_SCAFFOLD_MARKER + std::to_string(scaffold);
+    const std::string gapComment = comment + STR_GAP_MARKER + std::to_string(gap);
 
     // Get contig identifier from the sequence comment
     const size_t contigNamePos = itSeq->getComment().find(" ");
@@ -195,7 +196,6 @@ void GapCutter::execute()
         const size_t flank2 = (d2 >= 2*k) ? std::min(d2-k, k+fuz) : d2;
 
         // Write the gap to file
-        const std::string gapComment = comment + STR_GAP_MARKER + std::to_string(gap);
         insertSequence(gapBank, gapComment, seq.substr(i + d1 - flank1, flank1 + l1 + flank2));
         insertSequence(contigBank, gapComment, seq.substr(i, d1 - flank1));
 
@@ -227,7 +227,6 @@ void GapCutter::execute()
         // First gap gets entire middle section as right flank, second gap gets
         // only k length right flank. Unfair and greedy, but makes merging them
         // back easier.
-        const std::string gapComment = comment + STR_GAP_MARKER + std::to_string(gap);
         insertSequence(gapBank, gapComment + STR_SPLIT_MARKER + "1", seq.substr(i + d1 - flank1, flank1 + l1 + d2));
         insertSequence(gapBank, gapComment + STR_SPLIT_MARKER + "2 " + std::to_string(k), seq.substr(i + d1 + l1 + d2 - k, k + l2 + flank3));
         insertSequence(contigBank, gapComment, seq.substr(i, d1 - flank1));
@@ -274,8 +273,6 @@ void GapCutter::execute()
         buffer[lsum] = '\0';
 
         const size_t flank2 = std::min(dn, k+fuz);
-
-        const std::string gapComment = comment + STR_GAP_MARKER + std::to_string(gap);
         insertSequence(gapBank, gapComment, seq.substr(i + d1 - flank1, flank1) + std::string(buffer) + seq.substr(i + d1 + lsum, flank2));
         insertSequence(contigBank, gapComment, seq.substr(i, d1 - flank1));
 
