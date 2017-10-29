@@ -273,7 +273,9 @@ void Gap2Seq::execute()
       // Remove ignored edges from flanks, insert filled sequence
       filledSeq = left_flank.substr(0, left_flank.length()-left_fuz) + &buf[left_max_fuz-left_fuz];
     } else {
-      filledSeq = buf;
+      memset(buf, 'N', length);
+      buf[length] = '\0';
+      filledSeq = left_flank + buf + right_flank;
     }
 
     // Write the filled scaffold to file
