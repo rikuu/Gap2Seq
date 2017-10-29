@@ -63,8 +63,12 @@ class Library:
             sys.exit(1)
 
     def filter_unmapped(self, filename):
-        # Filter unmapped reads for thresholding later
-        subprocess.check_call([READFILTER, '-unmapped-only',
+        # TODO: Allow ReadFilter to run with just -unmapped-only
+        subprocess.check_call([READFILTER,
+            '-unmapped-only',
+            '-scaffold', '0',
+            '-breakpoint', '0',
+            '-gap-length', '0',
             '-reads', filename] + self.data())
 
     def data(self):
@@ -87,7 +91,7 @@ class Gap:
 
         return ['-scaffold', str(self.scaffold),
             '-breakpoint', str(self.position),
-            '-flank-length', str(self.flank_length)
+            '-flank-length', str(self.flank_length),
             '-gap-length', length]
 
     def filler_data(self):
@@ -180,7 +184,7 @@ def fill_gap(libraries, gap, k, fuz, solid, derr, max_mem, randseed,
                 '-dist-error', str(derr),
                 '-max-mem', str(max_mem),
                 '-randseed', str(randseed),
-                '-reads', ','.join(reads)
+                '-reads', ','.join(reads),
                 '-filled', os.path.join(wd, filled)] + binary_options + gap.filler_data(),
                 stderr=f)
         except subprocess.CalledProcessError:
@@ -401,7 +405,7 @@ if __name__ == '__main__':
 
         # Filter unmapped reads
         for i, lib in enumerate(libraries):
-            lib.unmapped('tmp.reads.' + i + '.unmapped')
+            lib.filter_unmapped('tmp.reads.' + str(i) + '.unmapped')
     elif args['reads'] != None:
         args['reads'] = args['reads'].split(',')
     else:

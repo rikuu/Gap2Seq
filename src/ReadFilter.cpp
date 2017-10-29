@@ -304,7 +304,6 @@ void ReadFilter::process_unmapped(const io_t &io, char* buffer,
   }
 }
 
-// Execute read ReadFilterion
 void ReadFilter::execute() {
   const std::string alignment = getInput()->getStr(STR_ALIGNMENT);
   const std::string output = getInput()->getStr(STR_OUTPUT);
