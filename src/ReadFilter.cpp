@@ -269,6 +269,7 @@ void ReadFilter::process_region(const io_t &io, const int tid, const int start,
   }
 }
 
+// Add read mates to Bloom filter
 void ReadFilter::process_mates(const io_t &io, const int tid, const int start,
     const int end, IBloom<std::string> *bloom) {
   sam_iterator iter(io, tid, start, end);
@@ -279,6 +280,7 @@ void ReadFilter::process_mates(const io_t &io, const int tid, const int start,
   }
 }
 
+// Output read mates from Bloom filter
 void ReadFilter::find_mates(const io_t &io, char *buffer, IBloom<std::string> *bloom,
     BankFasta *bank, int *seqlen, int *num_of_reads) {
   sam_iterator iter(io, ".");

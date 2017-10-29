@@ -69,7 +69,8 @@ class Library:
             '-scaffold', '0',
             '-breakpoint', '0',
             '-gap-length', '0',
-            '-reads', filename] + self.data())
+            '-reads', filename] + self.data(),
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     def data(self):
         return ['-bam', self.bam,
@@ -160,7 +161,7 @@ def fill_gap(libraries, gap, k, fuz, solid, derr, max_mem, randseed,
 
             # Thresholding has to be done here in case of multiple libraries
             threshold = sum([lib.threshold for lib in libraries])
-            if (filtered_length / gap.length) < threshold:
+            if (filtered_length / gap.gap_length) < threshold:
                 for i, lib in enumerate(libraries):
                     reads_file = 'tmp.reads.' + str(i) + '.unmapped'
                     if os.path.isfile(reads_file):
