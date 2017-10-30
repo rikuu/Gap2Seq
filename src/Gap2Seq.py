@@ -196,7 +196,7 @@ def fill_gap(libraries, gap, k, fuz, solid, derr, max_mem, randseed,
 
     # Parse filled scaffold
     fill = ''
-    if log != b'':
+    if log != b'' and os.path.isfile(filled):
         with open(filled, 'r') as f:
             for line in f:
                 if line[0] != '>':
@@ -207,6 +207,8 @@ def fill_gap(libraries, gap, k, fuz, solid, derr, max_mem, randseed,
             'tmp.filled.' + gap.id,
             'tmp.extract.' + gap.id + '.log',
             'tmp.gap2seq.' + gap.id + '.log'])
+    else:
+        fill = gap.left + 'N' * gap.gap_length + gap.right
 
     # Cleanup reads
     if filtered:
@@ -465,6 +467,10 @@ if __name__ == '__main__':
         successful_gaps = res.get(timeout=1)
         pool.close()
         pool.join()
+
+    # Cleanup unmapped reads
+    if args['libraries'] != None:
+        subprocess.check_call(['rm', 'tmp.reads.*.unmapped'])
 
     if scaffolds_cut:
         print('Merging filled gaps and contigs')

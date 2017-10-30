@@ -149,6 +149,12 @@ the parameter -best-only.
 ReadFilter now infers the read length. This breaks compatibility with old read
 library configurations.
 
+Read filtering is slightly improved for gap filling. Unchanged for insertion
+genotyping.
+
+Unmapped reads are now filtered from alignments only once per read library.
+Speeds up gap filling around 30% for large scaffolds.
+
 ### Version 3.0
 
 Gap2Seq.sh is replaced with a Python script, which accepts gaps/scaffolds in
