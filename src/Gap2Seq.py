@@ -470,7 +470,7 @@ if __name__ == '__main__':
 
     # Cleanup unmapped reads
     if args['libraries'] != None:
-        subprocess.check_call(['rm', 'tmp.reads.*.unmapped'])
+        subprocess.check_call(['rm', '-f', 'tmp.reads.*.unmapped'])
 
     if scaffolds_cut:
         print('Merging filled gaps and contigs')

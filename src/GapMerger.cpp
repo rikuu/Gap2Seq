@@ -24,6 +24,8 @@
 
 #include <gatb/gatb_core.hpp>
 
+// #define DEBUG
+
 /****************************************************************************/
 
 // Constants for command line parameters
@@ -34,10 +36,12 @@ static const char* STR_GAPS = "-gaps";
 /****************************************************************************/
 
 static const char* STR_SCAFFOLD_MARKER = " scaffold ";
+static const char* STR_CONTIG_MARKER = " contig ";
 static const char* STR_GAP_MARKER = " gap ";
 static const char* STR_SPLIT_MARKER = " split ";
 
 static const size_t SCAFFOLD_MARKER_LENGTH = 10u;
+static const size_t CONTIG_MARKER_LENGTH = 8u;
 static const size_t GAP_MARKER_LENGTH = 5u;
 static const size_t SPLIT_MARKER_LENGTH = 7u;
 
@@ -51,6 +55,7 @@ public:
 
     int parseGapIndex(const std::string &) const;
     int parseScaffoldIndex(const std::string &) const;
+    int parseContigIndex(const std::string &) const;
 
     void insertSequence(BankFasta &, const std::string &,
       const std::string &) const;
@@ -88,6 +93,25 @@ int GapMerger::parseGapIndex(const std::string &comment) const
   return std::stoi(index);
 }
 
+int GapMerger::parseContigIndex(const std::string &comment) const
+{
+  const size_t contig_pos = comment.find(STR_CONTIG_MARKER);
+  if (contig_pos == std::string::npos) {
+    return -1;
+  }
+
+  std::string index = "";
+  const size_t gap_pos = comment.find(STR_GAP_MARKER);
+  if (gap_pos == std::string::npos) {
+    index = comment.substr(contig_pos + CONTIG_MARKER_LENGTH);
+  } else {
+    index = comment.substr(contig_pos + CONTIG_MARKER_LENGTH,
+      gap_pos - (contig_pos + CONTIG_MARKER_LENGTH));
+  }
+
+  return std::stoi(index);
+}
+
 int GapMerger::parseScaffoldIndex(const std::string &comment) const
 {
   const size_t scaffold_pos = comment.find(STR_SCAFFOLD_MARKER);
@@ -95,23 +119,26 @@ int GapMerger::parseScaffoldIndex(const std::string &comment) const
     return -1;
   }
 
-  std::string index = "";
-  const size_t gap_pos = comment.find(STR_GAP_MARKER);
-  if (gap_pos == std::string::npos) {
-    index = comment.substr(scaffold_pos + SCAFFOLD_MARKER_LENGTH);
-  } else {
-    index = comment.substr(scaffold_pos + SCAFFOLD_MARKER_LENGTH,
-      gap_pos - (scaffold_pos + SCAFFOLD_MARKER_LENGTH));
-  }
+  const size_t contig_pos = comment.find(STR_CONTIG_MARKER);
+  assert(contig_pos != std::string::npos);
 
-  return std::stoi(index);
+  return std::stoi(comment.substr(scaffold_pos + SCAFFOLD_MARKER_LENGTH,
+    contig_pos - (scaffold_pos + SCAFFOLD_MARKER_LENGTH)));
 }
 
 void GapMerger::insertSequence(BankFasta &bank, const std::string &comment,
   const std::string &sequence) const
 {
   Sequence seq((char *) sequence.c_str());
-  seq._comment = comment;
+
+  // Remove markers from comment, i.e. remove anything after scaffold marker
+  const size_t marker_pos = comment.find(STR_SCAFFOLD_MARKER);
+  if (marker_pos == std::string::npos) {
+    seq._comment = comment;
+  } else {
+    seq._comment = comment.substr(0, marker_pos);
+  }
+
   bank.insert(seq);
 }
 
@@ -137,68 +164,62 @@ void GapMerger::execute()
 
   int contigs = 0;
   int gaps = 0;
-
   int scaffoldIndex = 0;
+
+  contigIter.first();
   std::string scaffold = "";
-  std::string scaffoldComment = "";
+  std::string scaffoldComment = contigIter->getComment();
 
   for (contigIter.first(); !contigIter.isDone(); contigIter.next()) {
-    contigs++;
-
     const std::string comment = contigIter->getComment();
     const std::string contig = contigIter->toString();
 
     const int contigScaffoldIndex = parseScaffoldIndex(comment);
+    const int contigIndex = parseContigIndex(comment);
     const int gapIndex = parseGapIndex(comment);
+
+    assert(contigIndex == contigs);
+    contigs++;
 
     // Scaffold done, write to file
     if (contigScaffoldIndex != scaffoldIndex) {
-      if (scaffold.size() > 0) {
-        insertSequence(scaffoldBank, scaffoldComment, scaffold);
-      }
+      assert(contigScaffoldIndex == scaffoldIndex + 1);
+      insertSequence(scaffoldBank, scaffoldComment, scaffold);
 
       scaffold = "";
-      scaffoldComment = "";
+      scaffoldComment = comment;
       scaffoldIndex = contigScaffoldIndex;
-    }
-
-    // Remove markers from comment, i.e. remove anything after scaffold marker
-    if (scaffoldComment.size() == 0) {
-      const size_t marker_pos = comment.find(STR_SCAFFOLD_MARKER);
-
-      if (marker_pos == std::string::npos) {
-        scaffoldComment = comment;
-      } else {
-        scaffoldComment = comment.substr(0, marker_pos);
-      }
     }
 
     scaffold += contig;
 
+    // Find the gap corresponding to the contig and append to scaffold
     if (gapIndex != -1) {
-      // Find the gap corresponding to the contig and append to scaffold
       std::string first = "", second = "";
+      // TODO: Speed this up, leads to O(N^2) time
       for (gapIter.first(); !gapIter.isDone(); gapIter.next()) {
         if (gapIndex == parseGapIndex(gapIter->getComment())) {
-          gaps++;
-
-          // Combine split gaps
-          const size_t marker_pos = gapIter->getComment().find(STR_SPLIT_MARKER);
-          if (marker_pos == std::string::npos) {
+          const size_t markerPos = gapIter->getComment().find(STR_SPLIT_MARKER);
+          if (markerPos == std::string::npos) {
             first = gapIter->toString();
             break;
           } else {
-            const int split_num = std::stoi(gapIter->getComment().substr(marker_pos + SPLIT_MARKER_LENGTH, 1));
-            if (split_num == 1) {
+            // Combine split gaps
+            const int splitNum = std::stoi(gapIter->getComment().substr(markerPos + SPLIT_MARKER_LENGTH, 1));
+            if (splitNum == 1) {
+              assert(first == "");
               first = gapIter->toString();
             } else {
+              assert(second == "");
               // Remove flank from second gap
               // TODO: Fix case where flank is changed by ignored nucleotides
-              const int split_length = std::stoi(gapIter->getComment().substr(marker_pos + SPLIT_MARKER_LENGTH + 2));
-              second = gapIter->toString().substr(split_length);
+              const int splitLength = std::stoi(gapIter->getComment().substr(markerPos + SPLIT_MARKER_LENGTH + 2));
+              second = gapIter->toString().substr(splitLength);
             }
 
-            std::cout << "first: " << first << " second: " << second << std::endl;
+            #ifdef DEBUG
+              std::cout << "first: " << first << " second: " << second << std::endl;
+            #endif
 
             if (first != "" && second != "") {
               break;
@@ -208,6 +229,8 @@ void GapMerger::execute()
       }
 
       scaffold += first + second;
+      assert(gapIndex == gaps);
+      gaps++;
     }
   }
 

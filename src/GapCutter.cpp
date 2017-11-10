@@ -30,6 +30,7 @@
 #define DEFAULT_K "31"
 #define DEFAULT_FUZ "10"
 #define DEFAULT_MASK false
+#define DEFAULT_NO_SPLIT false
 
 /****************************************************************************/
 
@@ -41,10 +42,12 @@ static const char* STR_GAPS = "-gaps";
 static const char* STR_FUZ = "-fuz";
 static const char* STR_BED = "-bed";
 static const char* STR_MASK = "-mask";
+static const char* STR_NO_SPLIT = "-no-split";
 
 /****************************************************************************/
 
 static const char* STR_SCAFFOLD_MARKER = " scaffold ";
+static const char* STR_CONTIG_MARKER = " contig ";
 static const char* STR_GAP_MARKER = " gap ";
 static const char* STR_SPLIT_MARKER = " split ";
 
@@ -77,6 +80,7 @@ GapCutter::GapCutter() : Tool("GapCutter")
     getParser()->push_front (new OptionOneParam (STR_FUZ, "Maximum number of nucleotides to ignore on gap fringes",  false, DEFAULT_FUZ));
     getParser()->push_front (new OptionOneParam (STR_KMER_LEN, "k-mer length",  false, DEFAULT_K));
     getParser()->push_front (new OptionNoParam (STR_MASK, "Mask sequences too short to use",  false, DEFAULT_MASK));
+    getParser()->push_front (new OptionNoParam (STR_NO_SPLIT, "Don't split flank sharing gaps",  false, DEFAULT_NO_SPLIT));
 }
 
 void GapCutter::insertSequence(BankFasta &bank, const std::string &comment,
@@ -124,6 +128,7 @@ void GapCutter::execute()
   const size_t k = (size_t) getInput()->getInt(STR_KMER_LEN);
   const size_t fuz = (size_t) getInput()->getInt(STR_FUZ);
   const bool mask = (getInput()->get(STR_MASK) != 0);
+  const bool no_split = (getInput()->get(STR_NO_SPLIT) != 0);
 
   std::cout << "Scaffolds file: " << scaffoldsFilename << std::endl;
   std::cout << "Contigs file: " << contigsFilename << std::endl;
@@ -131,6 +136,8 @@ void GapCutter::execute()
   std::cout << "BED file: " << bedFilename << std::endl;
   std::cout << "k-mer size: " << k << std::endl;
   std::cout << "Fuz: " << fuz << std::endl;
+  std::cout << "Mask: " << mask << std::endl;
+  std::cout << "Split: " << !no_split << std::endl;
 
   // Open the input scaffold file
   BankFasta scaffoldBank(scaffoldsFilename);
@@ -147,33 +154,26 @@ void GapCutter::execute()
   int contig = 0;
   int gap = 0;
   int scaffold = 0;
-  int allGaps = 0;
 
   for (itSeq.first(); !itSeq.isDone(); itSeq.next()) {
     const std::string seq = itSeq->toString();
-    const std::string comment = itSeq->getComment() + STR_SCAFFOLD_MARKER + std::to_string(scaffold);
-    const std::string gapComment = comment + STR_GAP_MARKER + std::to_string(gap);
 
     // Get contig identifier from the sequence comment
     const size_t contigNamePos = itSeq->getComment().find(" ");
-    const std::string contigName = (contigNamePos == std::string::npos) ?
-      itSeq->getComment() : itSeq->getComment().substr(0, contigNamePos);
+    assert(contigNamePos != std::string::npos);
+    const std::string contigName = itSeq->getComment().substr(0, contigNamePos);
 
     size_t i = 0;
     while (i < seq.size()) {
+      const std::string comment = itSeq->getComment() +
+        STR_SCAFFOLD_MARKER + std::to_string(scaffold) +
+        STR_CONTIG_MARKER + std::to_string(contig);
+
+      const std::string gapComment = comment +
+        STR_GAP_MARKER + std::to_string(gap);
+
       const size_t d1 = distanceToNextGap(seq, i);
       const size_t l1 = gapLength(seq, i + d1);
-
-      // Not enough sequence for left flank, skip to next possible flank position
-      if (d1 < k) {
-        if (d1 == 0) {
-          i = seq.size();
-          continue;
-        }
-
-        i += d1 + l1;
-        continue;
-      }
 
       // No gaps left, write contig
       if (d1 > 0 && l1 == 0) {
@@ -181,6 +181,15 @@ void GapCutter::execute()
         contig++;
 
         i = seq.size();
+        continue;
+      }
+
+      // Not enough sequence for left flank, skip to next possible flank position
+      if (d1 < k) {
+        insertSequence(contigBank, comment, seq.substr(i, d1 + l1));
+        contig++;
+
+        i += d1 + l1;
         continue;
       }
 
@@ -193,7 +202,8 @@ void GapCutter::execute()
 
       // Case 1: Gap has enough sequence on both sides
       if (d2 >= 2*k || (d2 >= k && d3 == 0)) {
-        const size_t flank2 = (d2 >= 2*k) ? std::min(d2-k, k+fuz) : d2;
+        // If last gap, add the rest of the scaffold as right flank
+        const size_t flank2 = (d2 >= 2*k) ? std::min(d2, k+fuz) : d2;
 
         // Write the gap to file
         insertSequence(gapBank, gapComment, seq.substr(i + d1 - flank1, flank1 + l1 + flank2));
@@ -219,36 +229,51 @@ void GapCutter::execute()
 
       // Case 2: Two gaps have overlapping flanks
       if (d2 >= k) {
-        // TODO: Deal with this
-        assert(d3 >= k);
+        if (!no_split && d3 >= k) {
+          const size_t flank3 = std::min(d3, k+fuz);
 
-        const size_t flank3 = std::min(d3, k+fuz);
+          // First gap gets entire middle section as right flank, second gap gets
+          // only k length right flank. Unfair and greedy, but makes merging them
+          // back easier.
+          insertSequence(gapBank, gapComment + STR_SPLIT_MARKER + "1",
+            seq.substr(i + d1 - flank1, flank1 + l1 + d2));
+          insertSequence(gapBank, gapComment + STR_SPLIT_MARKER + "2 " + std::to_string(k),
+            seq.substr(i + d1 + l1 + d2 - k, k + l2 + flank3));
+          insertSequence(contigBank, gapComment, seq.substr(i, d1 - flank1));
 
-        // First gap gets entire middle section as right flank, second gap gets
-        // only k length right flank. Unfair and greedy, but makes merging them
-        // back easier.
-        insertSequence(gapBank, gapComment + STR_SPLIT_MARKER + "1", seq.substr(i + d1 - flank1, flank1 + l1 + d2));
-        insertSequence(gapBank, gapComment + STR_SPLIT_MARKER + "2 " + std::to_string(k), seq.substr(i + d1 + l1 + d2 - k, k + l2 + flank3));
-        insertSequence(contigBank, gapComment, seq.substr(i, d1 - flank1));
+          bedFile << contigName << "\t" << i + d1 - flank1 << "\t" << i + d1 + l1 + d2 << std::endl;
+          bedFile << contigName << "\t" << i + d1 + l1 << "\t" << i + d1 + l1 + d2 + l2 + flank3 << std::endl;
 
-        bedFile << contigName << "\t" << i + d1 - flank1 << "\t" << i + d1 + l1 + d2 << std::endl;
-        bedFile << contigName << "\t" << i + d1 + l1 << "\t" << i + d1 + l1 + d2 + l2 + flank3 << std::endl;
+          #ifdef DEBUG
+            std::cout << "Case2: " << comment <<
+              " d1: " << d1 << " d2: " << d2 << " d3: " << d3 <<
+              " l1: " << l1 << " l2: " << l2 <<
+              " flank1: " << flank1 << " flank3: " << flank3 << std::endl;
+          #endif
 
-        #ifdef DEBUG
-          std::cout << "Case2: " << comment <<
-            " d1: " << d1 << " d2: " << d2 << " d3: " << d3 <<
-            " l1: " << l1 << " l2: " << l2 <<
-            " flank1: " << flank1 << " flank3: " << flank3 << std::endl;
-        #endif
+          gap++;
+          contig++;
 
-        gap++;
-        contig++;
+          i += d1 + l1 + d2 + l2 + flank3;
+          continue;
+        } else {
+          const size_t flank2 = std::min(d2, k+fuz);
 
-        i += d1 + l1 + d2 + l2 + flank3;
-        continue;
+          insertSequence(gapBank, gapComment, seq.substr(i + d1 - flank1, flank1 + l1 + flank2));
+          insertSequence(contigBank, gapComment, seq.substr(i, d1 - flank1));
+
+          bedFile << contigName << "\t" << i + d1 - flank1 << "\t" << i + d1 + l1 + flank2 << std::endl;
+
+          gap++;
+          contig++;
+
+          i += d1 + l1 + flank2;
+          continue;
+        }
       }
 
-      // Case 3: Two (or more) gaps encircle a sequence(s) too short to be a flank(s)
+      // Case 3: Two (or more) gaps surround a sequence(s) too short to be a
+      // flank(s)
       size_t lsum = l1 + d2 + l2, dn = d3;
       while (dn > 0 && dn < k) {
         lsum += dn + gapLength(seq, i + d1 + lsum + dn);
@@ -256,7 +281,7 @@ void GapCutter::execute()
       }
 
       // Last sequence not long enough to be a flank
-      if (dn == 0) {
+      if (dn < k) {
         insertSequence(contigBank, comment, seq.substr(i));
         contig++;
 
@@ -273,10 +298,12 @@ void GapCutter::execute()
         buffer[lsum] = '\0';
 
         const size_t flank2 = std::min(dn, k+fuz);
-        insertSequence(gapBank, gapComment, seq.substr(i + d1 - flank1, flank1) + std::string(buffer) + seq.substr(i + d1 + lsum, flank2));
+        insertSequence(gapBank, gapComment, seq.substr(i + d1 - flank1, flank1) +
+          std::string(buffer) + seq.substr(i + d1 + lsum, flank2));
         insertSequence(contigBank, gapComment, seq.substr(i, d1 - flank1));
 
-        bedFile << contigName << "\t" << i + d1 - flank1 << "\t" << i + d1 + lsum + flank2 << std::endl;
+        bedFile << contigName << "\t" << i + d1 - flank1 << "\t" <<
+          i + d1 + lsum + flank2 << std::endl;
 
         delete[] buffer;
 
@@ -292,9 +319,9 @@ void GapCutter::execute()
 
         i += d1 + lsum + flank2;
       } else {
-        insertSequence(contigBank, gapComment, seq.substr(i, d1 + lsum));
-
+        insertSequence(contigBank, comment, seq.substr(i, d1 + lsum));
         contig++;
+
         i += d1 + lsum;
       }
     }
