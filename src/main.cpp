@@ -22,15 +22,11 @@
 // We include the header file for the tool
 #include <Gap2Seq.hpp>
 
-int main (int argc, char* argv[])
+int main(int argc, char *argv[])
 {
-    try
-    {
-        // We run the tool with the provided command line arguments.
-        Gap2Seq().run (argc, argv);
-    }
-    catch (Exception& e)
-    {
+    try {
+        Gap2Seq().run(argc, argv);
+    } catch (Exception &e) {
         std::cout << "EXCEPTION: " << e.getMessage() << std::endl;
         return EXIT_FAILURE;
     }

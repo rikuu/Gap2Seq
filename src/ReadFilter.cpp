@@ -26,7 +26,8 @@
 #include <functional>
 
 // GATB-core Bloom filter requires hash1 function for items
-inline u_int64_t hash1(const std::string &key, u_int64_t seed=0) {
+inline u_int64_t hash1(const std::string &key, u_int64_t seed = 0)
+{
   return std::hash<std::string>{}(key);
 }
 
@@ -36,26 +37,27 @@ inline u_int64_t hash1(const std::string &key, u_int64_t seed=0) {
 
 /*****************************************************************************/
 
-static const char* STR_ALIGNMENT = "-bam";
-static const char* STR_OUTPUT = "-reads";
+static const char *STR_ALIGNMENT = "-bam";
+static const char *STR_OUTPUT = "-reads";
 
-static const char* STR_MEAN = "-mean";
-static const char* STR_STD_DEV = "-std-dev";
+static const char *STR_MEAN = "-mean";
+static const char *STR_STD_DEV = "-std-dev";
 
-static const char* STR_SCAFFOLD = "-scaffold";
-static const char* STR_GAP_BREAKPOINT = "-breakpoint";
+static const char *STR_SCAFFOLD = "-scaffold";
+static const char *STR_GAP_BREAKPOINT = "-breakpoint";
 
-static const char* STR_FLANK_LENGTH = "-flank-length";
+static const char *STR_FLANK_LENGTH = "-flank-length";
 
-static const char* STR_GAP_LENGTH = "-gap-length";
-static const char* STR_THRESHOLD = "-unmapped";
+static const char *STR_GAP_LENGTH = "-gap-length";
+static const char *STR_THRESHOLD = "-unmapped";
 
-static const char* STR_ONLY_UNMAPPED = "-unmapped-only";
+static const char *STR_ONLY_UNMAPPED = "-unmapped-only";
 
 /*****************************************************************************/
 
-class io_t {
- public:
+class io_t
+{
+public:
   samFile *sam = NULL;
   bam_hdr_t *header = NULL;
   hts_idx_t *idx = NULL;
@@ -63,7 +65,8 @@ class io_t {
 
   io_t(const std::string &);
 
-  void unload() {
+  void unload()
+  {
     bam_hdr_destroy(this->header);
     sam_close(this->sam);
     loaded = false;
@@ -71,22 +74,20 @@ class io_t {
 };
 
 // Loads a bam/sam file into an IO object
-io_t::io_t(const std::string &samFilename) {
+io_t::io_t(const std::string &samFilename)
+{
   this->sam = sam_open(samFilename.c_str(), "r");
   if (this->sam == NULL) {
-    // std::cerr << "ERROR: SAM file not found!" << std::endl;
     return;
   }
 
   this->header = sam_hdr_read(this->sam);
   if (this->header == NULL) {
-    // std::cerr << "ERROR: SAM header error!" << std::endl;
     return;
   }
 
   this->idx = sam_index_load(this->sam, samFilename.c_str());
   if (this->idx == NULL) {
-    // std::cerr << "ERROR: SAM index not found!" << std::endl;
     return;
   }
 
@@ -95,21 +96,29 @@ io_t::io_t(const std::string &samFilename) {
 
 /*****************************************************************************/
 
-inline uint8_t complement(const uint8_t n) {
+inline uint8_t complement(const uint8_t n)
+{
   switch (n) {
-    case 1: return 8; break;
-    case 2: return 4; break;
-    case 4: return 2; break;
-    case 8: return 1; break;
-    case 15:
-    default: return 15; break;
+  case 1:
+    return 8;
+  case 2:
+    return 4;
+  case 4:
+    return 2;
+  case 8:
+    return 1;
+  case 15:
+  default:
+    return 15;
   }
 }
 
 inline uint8_t querySequence(const uint8_t *query, const int32_t length,
-    const int32_t index, const bool reverse) {
-  if (!reverse)
+                             const int32_t index, const bool reverse)
+{
+  if (!reverse) {
     return bam_seqi(query, index);
+  }
 
   return complement(bam_seqi(query, length - 1 - index));
 }
@@ -118,25 +127,26 @@ inline uint8_t querySequence(const uint8_t *query, const int32_t length,
 
 // Converts an alignment to std::string. Handles reverse complements.
 std::string convertToString(const uint8_t *query, const int32_t length,
-    const bool reverse, char* buffer) {
+                            const bool reverse, char *buffer)
+{
   for (int32_t i = 0; i < length; i++) {
     switch (querySequence(query, length, i, reverse)) {
-      case 0x1:
-        buffer[i] = 'A';
-        break;
-      case 0x2:
-        buffer[i] = 'C';
-        break;
-      case 0x4:
-        buffer[i] = 'G';
-        break;
-      case 0x8:
-        buffer[i] = 'T';
-        break;
-      case 0x15:
-      default:
-        buffer[i] = 'N';
-        break;
+    case 0x1:
+      buffer[i] = 'A';
+      break;
+    case 0x2:
+      buffer[i] = 'C';
+      break;
+    case 0x4:
+      buffer[i] = 'G';
+      break;
+    case 0x8:
+      buffer[i] = 'T';
+      break;
+    case 0x15:
+    default:
+      buffer[i] = 'N';
+      break;
     }
   }
 
@@ -146,17 +156,20 @@ std::string convertToString(const uint8_t *query, const int32_t length,
 
 /*****************************************************************************/
 
-static inline const std::string bam2string(const bam1_t *bam) {
+static inline const std::string bam2string(const bam1_t *bam)
+{
   return std::string(bam_get_qname(bam)) + (((bam->core.flag & BAM_FREAD1) != 0) ? "/1" : "/2");
 }
 
-static inline const std::string bam2string_mate(const bam1_t *bam) {
+static inline const std::string bam2string_mate(const bam1_t *bam)
+{
   return std::string(bam_get_qname(bam)) + (((bam->core.flag & BAM_FREAD1) != 0) ? "/2" : "/1");
 }
 
 /*****************************************************************************/
 
-class sam_iterator {
+class sam_iterator
+{
 private:
   samFile *m_sam;
   hts_itr_t *m_iter;
@@ -165,7 +178,8 @@ public:
   bam1_t *bam;
 
   sam_iterator(const io_t io, const int tid, const int start, const int end)
-      : m_sam(io.sam), bam(bam_init1()) {
+      : m_sam(io.sam), bam(bam_init1())
+  {
     m_iter = sam_itr_queryi(io.idx, tid, start, end);
     if (m_iter == NULL) {
       std::cerr << "WARNING: SAM iterator is NULL!" << std::endl;
@@ -173,26 +187,33 @@ public:
   }
 
   sam_iterator(const io_t io, const char *string)
-      : m_sam(io.sam), bam(bam_init1()) {
+      : m_sam(io.sam), bam(bam_init1())
+  {
     m_iter = sam_itr_querys(io.idx, io.header, string);
     if (m_iter == NULL) {
       std::cerr << "WARNING: SAM iterator is NULL!" << std::endl;
     }
   }
 
-  ~sam_iterator() {
+  ~sam_iterator()
+  {
     hts_itr_destroy(m_iter);
     bam_destroy1(bam);
   }
 
-  inline bool next() {
-    if (m_iter == NULL) return false;
+  inline bool next()
+  {
+    if (m_iter == NULL) {
+      return false;
+    }
+
     return (sam_itr_next(m_sam, m_iter, bam) >= 0);
   }
 };
 
 // Counts the number of reads by iterating through the alignment file
-uint64_t count_reads(const std::string &filename, int32_t *read_length) {
+uint64_t count_reads(const std::string &filename, int32_t *read_length)
+{
   io_t io(filename);
   sam_iterator iter(io, ".");
 
@@ -210,22 +231,24 @@ uint64_t count_reads(const std::string &filename, int32_t *read_length) {
 
 /*****************************************************************************/
 
-class ReadFilter : public Tool {
- public:
-    ReadFilter();
-    void execute();
+class ReadFilter : public Tool
+{
+public:
+  ReadFilter();
+  void execute();
 
-    // Prints an alignment in fasta format
-    void print_fasta(const bam1_t*, char*, BankFasta*);
+  // Prints an alignment in fasta format
+  void print_fasta(const bam1_t *, char *, BankFasta *);
 
-    // Prints all alignments in a region
-    void process_region(const io_t&, const int, const int, const int, char*, IBloom<std::string>*, BankFasta*, int*, int*);
-    void process_mates(const io_t&, const int, const int, const int, IBloom<std::string>*);
-    void find_mates(const io_t&, char*, IBloom<std::string>*, BankFasta*, int*, int*);
-    void process_unmapped(const io_t&, char*, IBloom<std::string>*, BankFasta*, int*);
+  // Prints all alignments in a region
+  void process_region(const io_t &, const int, const int, const int, char *, IBloom<std::string> *, BankFasta *, int *, int *);
+  void process_mates(const io_t &, const int, const int, const int, IBloom<std::string> *);
+  void find_mates(const io_t &, char *, IBloom<std::string> *, BankFasta *, int *, int *);
+  void process_unmapped(const io_t &, char *, IBloom<std::string> *, BankFasta *, int *);
 };
 
-ReadFilter::ReadFilter() : Tool("ReadFilter") {
+ReadFilter::ReadFilter() : Tool("ReadFilter")
+{
   // Input / output
   getParser()->push_front(new OptionOneParam(STR_ALIGNMENT, "Aligned BAM file", true));
   getParser()->push_front(new OptionOneParam(STR_OUTPUT, "FASTA-formatted output file", true));
@@ -238,7 +261,7 @@ ReadFilter::ReadFilter() : Tool("ReadFilter") {
   getParser()->push_front(new OptionOneParam(STR_SCAFFOLD, "Scaffold name", true));
   getParser()->push_front(new OptionOneParam(STR_GAP_BREAKPOINT, "Gap breakpoint position", true));
   getParser()->push_front(new OptionOneParam(STR_GAP_LENGTH, "Gap length (in the scaffold)", false, "-1"));
-  getParser()->push_front(new OptionOneParam(STR_FLANK_LENGTH , "Flank length", false, "-1"));
+  getParser()->push_front(new OptionOneParam(STR_FLANK_LENGTH, "Flank length", false, "-1"));
 
   getParser()->push_front(new OptionNoParam(STR_ONLY_UNMAPPED, "Output unmapped reads"));
 }
@@ -246,9 +269,10 @@ ReadFilter::ReadFilter() : Tool("ReadFilter") {
 /*****************************************************************************/
 
 // Output a bam object into GATB fasta bank
-void ReadFilter::print_fasta(const bam1_t *bam, char* buffer, BankFasta *bank) {
+void ReadFilter::print_fasta(const bam1_t *bam, char *buffer, BankFasta *bank)
+{
   const std::string sequence = convertToString(bam_get_seq(bam),
-    bam->core.l_qseq, bam_is_rev(bam), buffer);
+                                               bam->core.l_qseq, bam_is_rev(bam), buffer);
 
   Sequence seq(buffer);
   seq._comment = bam2string(bam);
@@ -257,8 +281,9 @@ void ReadFilter::print_fasta(const bam1_t *bam, char* buffer, BankFasta *bank) {
 
 // Output reads that map to a region in a scaffold and not in the Bloom filter.
 void ReadFilter::process_region(const io_t &io, const int tid, const int start,
-    const int end, char* buffer, IBloom<std::string> *bloom, BankFasta *bank,
-    int *seqlen, int *num_of_reads) {
+                                const int end, char *buffer, IBloom<std::string> *bloom, BankFasta *bank,
+                                int *seqlen, int *num_of_reads)
+{
   sam_iterator iter(io, tid, start, end);
   while (iter.next()) {
     if (!bloom->contains(bam2string(iter.bam))) {
@@ -271,7 +296,8 @@ void ReadFilter::process_region(const io_t &io, const int tid, const int start,
 
 // Add read mates to Bloom filter
 void ReadFilter::process_mates(const io_t &io, const int tid, const int start,
-    const int end, IBloom<std::string> *bloom) {
+                               const int end, IBloom<std::string> *bloom)
+{
   sam_iterator iter(io, tid, start, end);
   while (iter.next()) {
     if ((iter.bam->core.flag & BAM_FMUNMAP) != 0) {
@@ -282,7 +308,8 @@ void ReadFilter::process_mates(const io_t &io, const int tid, const int start,
 
 // Output read mates from Bloom filter
 void ReadFilter::find_mates(const io_t &io, char *buffer, IBloom<std::string> *bloom,
-    BankFasta *bank, int *seqlen, int *num_of_reads) {
+                            BankFasta *bank, int *seqlen, int *num_of_reads)
+{
   sam_iterator iter(io, ".");
   while (iter.next()) {
     if (bloom->contains(bam2string_mate(iter.bam))) {
@@ -294,19 +321,21 @@ void ReadFilter::find_mates(const io_t &io, char *buffer, IBloom<std::string> *b
 }
 
 // Output all unmapped reads
-void ReadFilter::process_unmapped(const io_t &io, char* buffer,
-    IBloom<std::string> *bloom, BankFasta *bank, int* num_of_reads) {
+void ReadFilter::process_unmapped(const io_t &io, char *buffer,
+                                  IBloom<std::string> *bloom, BankFasta *bank, int *num_of_reads)
+{
   sam_iterator iter(io, ".");
   while (iter.next()) {
     if ((iter.bam->core.flag & BAM_FUNMAP) != 0 &&
-          !bloom->contains(bam2string(iter.bam))) {
+        !bloom->contains(bam2string(iter.bam))) {
       print_fasta(iter.bam, buffer, bank);
       (*num_of_reads)++;
     }
   }
 }
 
-void ReadFilter::execute() {
+void ReadFilter::execute()
+{
   const std::string alignment = getInput()->getStr(STR_ALIGNMENT);
   const std::string output = getInput()->getStr(STR_OUTPUT);
 
@@ -333,7 +362,7 @@ void ReadFilter::execute() {
   IBloom<std::string> *bloom = new BloomSynchronized<std::string>(5 * num_of_reads);
 
   // Allocate memory for string conversions
-  char *buffer = new char[read_length+1];
+  char *buffer = new char[read_length + 1];
 
   // Open output file
   BankFasta reads(output);
@@ -344,13 +373,13 @@ void ReadFilter::execute() {
     const int tid = bam_name2id(io.header, scaffold.c_str());
 
     // Extract pairs from the left mappings
-    const int left_start = breakpoint - (mean_insert + 3*std_dev + 2*read_length);
-    const int left_end = breakpoint - (mean_insert - 3*std_dev + read_length);
+    const int left_start = breakpoint - (mean_insert + 3 * std_dev + 2 * read_length);
+    const int left_end = breakpoint - (mean_insert - 3 * std_dev + read_length);
     process_mates(io, tid, left_start, left_end, bloom);
 
     // Extract pairs from the right mappings
-    const int right_start = breakpoint + (mean_insert + 3*std_dev + read_length) + gap_length;
-    const int right_end = breakpoint + (mean_insert - 3*std_dev + read_length) + gap_length;
+    const int right_start = breakpoint + (mean_insert + 3 * std_dev + read_length) + gap_length;
+    const int right_end = breakpoint + (mean_insert - 3 * std_dev + read_length) + gap_length;
     process_mates(io, tid, right_start, right_end, bloom);
 
     // Output reads and count length
@@ -378,10 +407,11 @@ void ReadFilter::execute() {
   io.unload();
 }
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[])
+{
   try {
     ReadFilter().run(argc, argv);
-  } catch (Exception& e) {
+  } catch (Exception &e) {
     std::cout << "EXCEPTION: " << e.getMessage() << std::endl;
     return EXIT_FAILURE;
   }

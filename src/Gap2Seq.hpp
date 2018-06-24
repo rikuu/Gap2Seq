@@ -32,14 +32,15 @@
 
 #include <gatb/gatb_core.hpp>
 
-typedef boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirectionalS > digraph;
+typedef boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirectionalS> digraph;
 typedef boost::graph_traits<digraph>::vertex_descriptor bnode;
 typedef boost::graph_traits<digraph>::edge_descriptor bedge;
 typedef std::vector<bnode> container;
 
 // Check if a file is readable
-inline bool is_readable(const std::string & file) {
-    std::ifstream f( file.c_str() );
+inline bool is_readable(const std::string &file)
+{
+    std::ifstream f(file.c_str());
     return !f.fail();
 }
 
@@ -52,32 +53,32 @@ extern ISynchronizer *global_lock;
 extern std::unordered_map<long long, long long> memuse;
 
 // Subgraph statistics
-struct subgraph_stats {
-  size_t vertices;
-  size_t edges;
-  size_t nontrivial_components;
-  size_t size_nontrivial_components;
-  size_t vertices_final;
-  size_t edges_final;
+struct subgraph_stats
+{
+    size_t vertices;
+    size_t edges;
+    size_t nontrivial_components;
+    size_t size_nontrivial_components;
+    size_t vertices_final;
+    size_t edges_final;
 };
 
 class Gap2Seq : public Tool
 {
-public:
-
+  public:
     // Constructor
-    Gap2Seq ();
+    Gap2Seq();
 
     // Actual job done by the tool is here
-    void execute ();
+    void execute();
 
     // Extract nodes reachable from a given kmer with given distance
-  std::set<Node> extract_reachable_nodes(const Graph &graph, const std::string &kmer, int d);
+    std::set<Node> extract_reachable_nodes(const Graph &graph, const std::string &kmer, int d);
 
-  // Fill a gap
-  int fill_gap(const Graph &graph, const std::string &kmer_left, const std::string &kmer_right, int gap_len,
-      int k, int gap_err, int left_max_fuz, int right_max_fuz, int *left_fuz, int *right_fuz,
-      long long max_mem, char *fill, bool skip_confident, bool all_paths, struct subgraph_stats *substats);
+    // Fill a gap
+    int fill_gap(const Graph &graph, const std::string &kmer_left, const std::string &kmer_right, int gap_len,
+                 int k, int gap_err, int left_max_fuz, int right_max_fuz, int *left_fuz, int *right_fuz,
+                 long long max_mem, char *fill, bool skip_confident, bool all_paths, struct subgraph_stats *substats);
 };
 
 /********************************************************************************/
