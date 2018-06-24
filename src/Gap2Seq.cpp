@@ -1033,7 +1033,7 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
 #endif
 
       // Get the neightbors of the node and update their dp rows
-      Graph::Vector<Node> neighbors = graph.predecessors(n);
+      GraphVector<Node> neighbors = graph.predecessors(n);
       map_element2 *node_me = reachableSetRight[n];
 
       // Number of paths to the parent node
@@ -1213,7 +1213,7 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
 #endif
 
       // Get the neighbors of the node and update their dp rows
-      Graph::Vector<Node> neighbors = graph.successors(n);
+      GraphVector<Node> neighbors = graph.successors(n);
       map_element *node_me = reachableSetLeft[n];
       // Number of paths to the parent node
       int num_paths = n.strand == STRAND_FORWARD ? node_me->getf(currentD-1) : node_me->getr(currentD-1);
@@ -1494,7 +1494,7 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
 
 	  // Check for end condition
 	  if (currentD2 > left_max_fuz || current != lnode) {
-	    Graph::Vector<Node> neighbors = graph.predecessors(current);
+	    GraphVector<Node> neighbors = graph.predecessors(current);
 	    for (size_t i = 0; i < neighbors.size(); i++) {
 	      Node n = neighbors[i];
 	      if (reachableSetLeft.find(n) != reachableSetLeft.end()) {
@@ -1555,7 +1555,7 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
 
 	    // Check for end condition
 	    if (currentD2 > left_max_fuz || current != lnode) {
-	      Graph::Vector<Node> neighbors = graph.predecessors(current);
+	      GraphVector<Node> neighbors = graph.predecessors(current);
 	      for (size_t i = 0; i < neighbors.size(); i++) {
 		Node n = neighbors[i];
 		if (reachableSetLeft.find(n) != reachableSetLeft.end()) {
@@ -1772,7 +1772,7 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
           fill[currentD2-1] = tolower(str[str.length()-1]);
 	}
 
-	Graph::Vector<Node> neighbors = graph.predecessors(current);
+	GraphVector<Node> neighbors = graph.predecessors(current);
 	for (size_t i = 0; i < neighbors.size(); i++) {
           Node n = neighbors[i];
           if (reachableSetLeft.find(n) != reachableSetLeft.end()) {
@@ -1903,7 +1903,7 @@ std::set<Node> Gap2Seq::extract_reachable_nodes(const Graph &graph, const std::s
     for (std::set<Node>::iterator it = border.begin(); it != border.end(); ++ it) {
       Node n = (Node) *it;
       reachableSet.insert(n);
-      Graph::Vector<Node> neighbors = graph.successors(n);
+      GraphVector<Node> neighbors = graph.successors(n);
       for (size_t i = 0; i < neighbors.size(); i++) {
 	nextBorder.insert(neighbors[i]);
       }

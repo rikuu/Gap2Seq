@@ -26,15 +26,15 @@ de Bruijn graph implementation and [htslib](http://www.htslib.org) for reading
 alignments for read filtering. The libraries are included in the Gap2Seq
 package.
 
-Compiling Gap2Seq requires GCC version 4.5 or newer and CMake version 2.6 or
-newer.
+Compiling Gap2Seq requires a C++11 compatible compiler (GCC 4.7+ or Clang 3.5+)
+and CMake version 3.1 or newer.
 
 ## Installation
 
 Unpack the Gap2Seq package.
 For compiling Gap2Seq run
 
-```
+```sh
 mkdir build;  cd build;  cmake ..;  make
 ```
 
@@ -90,7 +90,7 @@ Unpack the data files.
 
 Run Gap2Seq (here we run it for the SGA scaffolds)
 
-```
+```sh
 Gap2Seq --scaffolds Assembly/SGA/genome.scf.fasta --filled Assembly/SGA/genome.scf.fill.fasta --reads Data/original/frag_1.fastq,Data/original/frag_2.fastq,Data/original/shortjump_1.fastq,Data/original/shortjump_2.fastq
 ```
 
@@ -100,7 +100,7 @@ The filled scaffolds are then in the file Assembly/SGA/genome.scf.fill.fasta.
 
 Align, sort, and index the read libraries to the scaffolds with e.g. BWA MEM.
 
-```
+```sh
 bwa index Assembly/SGA/genome.scf.fasta
 
 bwa mem Assembly/SGA/genome.scf.fasta Data/original/frag_1.fastq Data/original/frag_2.fastq | samtools sort -O bam - > Data/original/frag.bam
@@ -114,14 +114,14 @@ Create a read library configuration file, a tab-separated list with a single
 read library per line:
 bam, mean insert size, std dev, threshold
 
-```
+```sh
 echo -e "Data/original/frag.bam\t180\t18\t40" > libraries.txt
 echo -e "Data/original/shortjump.bam\t3500\t350\t40" >> libraries.txt
 ```
 
 Run Gap2Seq.
 
-```
+```sh
 Gap2Seq --scaffolds Assembly/SGA/genome.scf.fasta --filled Assembly/SGA/genome.scf.fill.fasta --libraries libraries.txt
 ```
 
@@ -131,7 +131,7 @@ First, using any insertion/variant calling pipeline, construct a VCF file of the
 variants in the reads against a reference genome. Then run Gap2Seq supplying it
 with the VCF, reference, and the reads.
 
-```
+```sh
 Gap2Seq --vcf Assembly/SGA/variants.vcf --reference Assembly/SGA/genome.scf.fasta --filled Assembly/SGA/genome.scf.fill.fasta --reads Data/original/frag_1.fastq,Data/original/frag_2.fastq,Data/original/shortjump_1.fastq,Data/original/shortjump_2.fastq
 ```
 
@@ -154,6 +154,8 @@ genotyping.
 
 Unmapped reads are now filtered from alignments only once per read library.
 Speeds up gap filling around 30% for large scaffolds.
+
+Updated to GATB-core 1.4.1
 
 ### Version 3.0
 
