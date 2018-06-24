@@ -44,10 +44,8 @@ inline bool is_readable(const std::string &file)
     return !f.fail();
 }
 
-#ifndef SINGLE_THREAD
 // Synchronizer for access to global variables
 extern ISynchronizer *global_lock;
-#endif
 
 // Array of memory usage accessed by thread id
 extern std::unordered_map<long long, long long> memuse;

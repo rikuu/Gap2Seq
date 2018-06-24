@@ -91,9 +91,7 @@ Gap2Seq::Gap2Seq() : Tool("Gap2Seq")
 }
 
 // Synchronizer for access to global variables
-#ifndef SINGLE_THREAD
 ISynchronizer *global_lock;
-#endif
 
 // Array of memory usage accessed by thread id
 std::unordered_map<long long, long long> memuse;
@@ -105,43 +103,56 @@ void print_statistics(int filledStart, int gapStart, int gapEnd,
                       bool skip_confident, bool unique_paths, const struct subgraph_stats &substats,
                       int gap, const std::string &comment)
 {
-#ifndef SINGLE_THREAD
-  {
-    LocalSynchronizer local(global_lock);
-#endif
+  LocalSynchronizer local(global_lock);
 
-    if (paths > 0 && (!unique_paths || paths == 1))
-    {
-      int filledLen = (int)strlen(&buf[left_max_fuz - left_fuz]) - k;
+  if (paths > 0 && (!unique_paths || paths == 1)) {
+    int filledLen = (int)strlen(&buf[left_max_fuz - left_fuz]) - k;
 
-      int lower = 0, upper = 0;
-      if (!skip_confident) {
-        for (int j = 0; j < filledLen; j++) {
-          if (isupper(buf[j + left_max_fuz - left_fuz])) {
-            upper++;
-          } else {
-            lower++;
-          }
+    int lower = 0, upper = 0;
+    if (!skip_confident) {
+      for (int j = 0; j < filledLen; j++) {
+        if (isupper(buf[j + left_max_fuz - left_fuz])) {
+          upper++;
+        } else {
+          lower++;
         }
-
-        std::cout << "Scaffold: " << comment << " GapStart: " << gapStart << " GapEnd: " << gapEnd << " GapLength: " << gap << " PathsFound: " << paths << " FilledStart: " << filledStart << " FilledEnd: " << filledStart + filledLen << " FilledGapLength: " << filledLen << " LeftMaxFuz: " << left_max_fuz << " LeftFuz: " << left_fuz << " RightMaxFuz: " << right_max_fuz << " RightFuz: " << right_fuz << " ConfidentBases: " << upper << " TotalBases: " << (upper + lower) << std::endl;
-
-        std::cout << "SubgraphStats: Vertices: " << substats.vertices << " Edges: " << substats.edges << " NontrivialStrongComponents: " << substats.nontrivial_components << " SizeNontrivialStrongComponents: " << substats.size_nontrivial_components << " VerticesFinal: " << substats.vertices_final << " EdgesFinal: " << substats.edges_final << std::endl;
-      } else {
-        std::cout << "Scaffold: " << comment << " GapStart: " << gapStart << " GapEnd: " << gapEnd << " GapLength: " << gap << " PathsFound: " << paths << " FilledStart: " << filledStart << " FilledEnd: " << filledStart + filledLen << " FilledGapLength: " << filledLen << " LeftFuz: " << left_fuz << " RightFuz: " << right_fuz << std::endl;
       }
+
+      std::cout << "Scaffold: " << comment << " GapStart: " << gapStart <<
+        " GapEnd: " << gapEnd << " GapLength: " << gap << " PathsFound: " << paths <<
+        " FilledStart: " << filledStart << " FilledEnd: " << filledStart + filledLen <<
+        " FilledGapLength: " << filledLen << " LeftMaxFuz: " << left_max_fuz <<
+        " LeftFuz: " << left_fuz << " RightMaxFuz: " << right_max_fuz <<
+        " RightFuz: " << right_fuz << " ConfidentBases: " << upper <<
+        " TotalBases: " << (upper + lower) << std::endl;
+
+      std::cout << "SubgraphStats: Vertices: " << substats.vertices <<
+        " Edges: " << substats.edges << " NontrivialStrongComponents: " << substats.nontrivial_components <<
+        " SizeNontrivialStrongComponents: " << substats.size_nontrivial_components <<
+        " VerticesFinal: " << substats.vertices_final << " EdgesFinal: " << substats.edges_final << std::endl;
     } else {
-      if (paths == -1) {
-        std::cout << "Scaffold: " << comment << " GapStart: " << gapStart << " GapEnd: " << gapEnd << " GapLength: " << gap << " PathsFound: 0 FilledStart: 0 FilledEnd: 0 FilledGapLength: 0"
-                  << " LeftMaxFuz: " << left_max_fuz << " LeftFuz: " << left_fuz << " RightMaxFuz: " << right_max_fuz << " RightFuz: " << right_fuz << " Memory limit exceeded" << std::endl;
-      } else {
-        std::cout << "Scaffold: " << comment << " GapStart: " << gapStart << " GapEnd: " << gapEnd << " GapLength: " << gap << " PathsFound: 0 FilledStart: 0 FilledEnd: 0 FilledGapLength: 0"
-                  << " LeftMaxFuz: " << left_max_fuz << " LeftFuz: " << left_fuz << " RightMaxFuz: " << right_max_fuz << " RightFuz: " << right_fuz << std::endl;
-      }
+      std::cout << "Scaffold: " << comment << " GapStart: " << gapStart <<
+        " GapEnd: " << gapEnd << " GapLength: " << gap << " PathsFound: " << paths <<
+        " FilledStart: " << filledStart << " FilledEnd: " << filledStart + filledLen <<
+        " FilledGapLength: " << filledLen << " LeftFuz: " << left_fuz <<
+        " RightFuz: " << right_fuz << std::endl;
     }
-#ifndef SINGLE_THREAD
+  } else {
+    if (paths == -1) {
+      std::cout << "Scaffold: " << comment << " GapStart: " << gapStart <<
+        " GapEnd: " << gapEnd << " GapLength: " << gap <<
+        " PathsFound: 0 FilledStart: 0 FilledEnd: 0 FilledGapLength: 0" <<
+        " LeftMaxFuz: " << left_max_fuz << " LeftFuz: " << left_fuz <<
+        " RightMaxFuz: " << right_max_fuz << " RightFuz: " << right_fuz <<
+        " Memory limit exceeded" << std::endl;
+    } else {
+      std::cout << "Scaffold: " << comment << " GapStart: " << gapStart <<
+        " GapEnd: " << gapEnd << " GapLength: " << gap <<
+        " PathsFound: 0 FilledStart: 0 FilledEnd: 0 FilledGapLength: 0" <<
+        " LeftMaxFuz: " << left_max_fuz << " LeftFuz: " << left_fuz <<
+        " RightMaxFuz: " << right_max_fuz << " RightFuz: " << right_fuz << std::endl;
+    }
   }
-#endif
 }
 
 /*********************************************************************
@@ -189,8 +200,7 @@ void Gap2Seq::execute()
     std::vector<std::string> files;
     std::stringstream ss(reads.c_str());
     std::string file;
-    while (std::getline(ss, file, ','))
-    {
+    while (std::getline(ss, file, ',')) {
       /*if (!is_readable(file)) {
         std::cerr << "Cannot access: " << file << std::endl;
         exit(EXIT_FAILURE);
@@ -220,8 +230,7 @@ void Gap2Seq::execute()
     const int length = getInput()->getInt(STR_LENGTH);
 
     // TODO: Also check for Ns in flanks
-    if (left_flank.length() < k || right_flank.length() < k)
-    {
+    if (left_flank.length() < k || right_flank.length() < k) {
       std::cerr << "Flanks need to be at least k length" << std::endl;
       return;
     }
@@ -282,7 +291,6 @@ void Gap2Seq::execute()
   int gapcount = 0;
   int filledgapcount = 0;
 
-#ifndef SINGLE_THREAD
   // Synchronization for output (both file and stdout)
   global_lock = System::thread().newSynchronizer();
   IDispatcher *d = getDispatcher();
@@ -290,19 +298,8 @@ void Gap2Seq::execute()
   d->setGroupSize(1);
 
   max_mem = max_mem / d->getExecutionUnitsNumber();
-#endif
-
   std::cout << "Max mem: " << max_mem << std::endl;
 
-  // Parallel code starts here
-#ifdef SINGLE_THREAD
-  for (itSeq.first(); !itSeq.isDone(); itSeq.next())
-  {
-    // Original sequence
-    std::string seq = itSeq->toString();
-    std::string comment = itSeq->getComment();
-#else
-  // IDispatcher::Status status = d->iterate(&itSeq, [&] (const Sequence& sequence) {
   Range<int>::Iterator intIt(1, d->getExecutionUnitsNumber());
   itSeq.first();
   IDispatcher::Status status = d->iterate(intIt, [&](int id) {
@@ -313,148 +310,131 @@ void Gap2Seq::execute()
       std::string comment = "";
       {
         LocalSynchronizer local(global_lock);
-        if (!itSeq.isDone())
-        {
+        if (!itSeq.isDone()) {
           seq = itSeq->toString();
           comment = itSeq->getComment();
           itSeq.next();
           more = true;
-        }
-        else
-        {
+        } else {
           more = false;
         }
       }
       if (!more)
         break;
-#endif
 
-    // Gap filled sequence
-    std::string filledSeq = "";
+      // Gap filled sequence
+      std::string filledSeq = "";
 
-    // Position where previous gap ended. The filled sequence is
-    // complete up to this position (in the original sequence)
-    int prevGapEnd = 0;
+      // Position where previous gap ended. The filled sequence is
+      // complete up to this position (in the original sequence)
+      int prevGapEnd = 0;
 
-    // Index over sequence positions
-    size_t i = 0;
+      // Index over sequence positions
+      size_t i = 0;
 
-    // Iterate over the sequence and find gaps
-    while (i < seq.size()) {
-      // A gap starts here
-      if (seq[i] == 'N' || seq[i] == 'n') {
-#ifndef SINGLE_THREAD
-        {
-          LocalSynchronizer local(global_lock);
-#endif
-          gapcount++;
-#ifndef SINGLE_THREAD
-        }
-#endif
+      // Iterate over the sequence and find gaps
+      while (i < seq.size()) {
+        // A gap starts here
+        if (seq[i] == 'N' || seq[i] == 'n') {
+          {
+            LocalSynchronizer local(global_lock);
+            gapcount++;
+          }
 
-        // The first possible starting position for left k-mer
-        int left_max_fuz = std::min(((int)i + k) - prevGapEnd, max_fuz);
-        int kmer_start = i - k - left_max_fuz;
+          // The first possible starting position for left k-mer
+          int left_max_fuz = std::min(((int)i + k) - prevGapEnd, max_fuz);
+          int kmer_start = i - k - left_max_fuz;
 
-        // Measure the gap length
-        int gap = 0;
-        while (i < seq.size() && (seq[i] == 'N' || seq[i] == 'n')) {
-          i++;
-          gap++;
-        }
+          // Measure the gap length
+          int gap = 0;
+          while (i < seq.size() && (seq[i] == 'N' || seq[i] == 'n')) {
+            i++;
+            gap++;
+          }
 
-        // Check that the end k-mer is complete, i.e. no N's and enough sequence
-        int right_max_fuz = std::min((int)seq.size() - ((int)i + k), max_fuz);
-        bool ok = i + k + right_max_fuz <= seq.size() ? true : false;
-        for (int j = 0; j < k + right_max_fuz && ok; j++) {
-          if (seq[i + j] == 'N' || seq[i + j] == 'n')
-            ok = false;
-        }
+          // Check that the end k-mer is complete, i.e. no N's and enough sequence
+          int right_max_fuz = std::min((int)seq.size() - ((int)i + k), max_fuz);
+          bool ok = i + k + right_max_fuz <= seq.size() ? true : false;
+          for (int j = 0; j < k + right_max_fuz && ok; j++) {
+            if (seq[i + j] == 'N' || seq[i + j] == 'n')
+              ok = false;
+          }
 
-        // Check that the start k-mer is complete
-        if (kmer_start >= prevGapEnd && ok)
-        {
-          // How many k-mers on the edge of the gap are ignored by the paths
-          int left_fuz = 0, right_fuz = 0;
+          // Check that the start k-mer is complete
+          if (kmer_start >= prevGapEnd && ok) {
+            // How many k-mers on the edge of the gap are ignored by the paths
+            int left_fuz = 0, right_fuz = 0;
 
-          // Buffer to hold the sequence to fill the gap
-          char *buf = new char[gap + k + d_err + left_max_fuz + right_max_fuz + 1 + 2];
+            // Buffer to hold the sequence to fill the gap
+            char *buf = new char[gap + k + d_err + left_max_fuz + right_max_fuz + 1 + 2];
 
-          // Struct for subgraph statistics
-          struct subgraph_stats substats;
+            // Struct for subgraph statistics
+            struct subgraph_stats substats;
 
-          // Number of paths found
-          int s = fill_gap(graph, seq.substr(kmer_start, k + left_max_fuz),
-                           seq.substr(i, k + right_max_fuz), gap, k, d_err, left_max_fuz,
-                           right_max_fuz, &left_fuz, &right_fuz, max_mem, buf, skip_confident, all_paths,
-                           &substats);
+            // Number of paths found
+            int s = fill_gap(graph, seq.substr(kmer_start, k + left_max_fuz),
+                             seq.substr(i, k + right_max_fuz), gap, k, d_err, left_max_fuz,
+                             right_max_fuz, &left_fuz, &right_fuz, max_mem, buf, skip_confident, all_paths,
+                             &substats);
 
-          int filledStart = filledSeq.length() + kmer_start + k + left_max_fuz - left_fuz - prevGapEnd;
-          int gapStart = kmer_start + k + left_max_fuz;
-          print_statistics(filledStart, gapStart, i, s, buf, k,
-                           left_max_fuz, right_max_fuz, left_fuz, right_fuz,
-                           skip_confident, unique_paths, substats, gap, comment);
+            int filledStart = filledSeq.length() + kmer_start + k + left_max_fuz - left_fuz - prevGapEnd;
+            int gapStart = kmer_start + k + left_max_fuz;
+            print_statistics(filledStart, gapStart, i, s, buf, k,
+                             left_max_fuz, right_max_fuz, left_fuz, right_fuz,
+                             skip_confident, unique_paths, substats, gap, comment);
 
-          // At least one path was found
-          if (s > 0 && (!unique_paths || s == 1)) {
-            filledgapcount++;
+            // At least one path was found
+            if (s > 0 && (!unique_paths || s == 1)) {
+              filledgapcount++;
 
 #ifdef DEBUG
-            std::cout << "Fill: " << &buf[left_max_fuz - left_fuz] << std::endl;
+              std::cout << "Fill: " << &buf[left_max_fuz - left_fuz] << std::endl;
 #endif
 
-            // Add seq from end of previous gap to gap start and the gap fill sequence
-            filledSeq = seq.substr(prevGapEnd, kmer_start + k + left_max_fuz - left_fuz - prevGapEnd) + (string)&buf[left_max_fuz - left_fuz];
+              // Add seq from end of previous gap to gap start and the gap fill sequence
+              filledSeq = seq.substr(prevGapEnd, kmer_start + k + left_max_fuz - left_fuz - prevGapEnd) + (string)&buf[left_max_fuz - left_fuz];
 
-            // Remove the right kmer
-            filledSeq = filledSeq.substr(0, filledSeq.length() - k);
+              // Remove the right kmer
+              filledSeq = filledSeq.substr(0, filledSeq.length() - k);
 
-            // adjust gap end index
-            i += right_fuz;
+              // adjust gap end index
+              i += right_fuz;
+            } else {
+              // No paths found, keep the gap
+              // Add seq from end of previous gap to end of this gap
+              filledSeq = filledSeq + seq.substr(prevGapEnd, kmer_start + k + left_max_fuz + gap - prevGapEnd);
+            }
+            delete[] buf;
           } else {
-            // No paths found, keep the gap
+            // Either left or right k-mer is not complete
             // Add seq from end of previous gap to end of this gap
             filledSeq = filledSeq + seq.substr(prevGapEnd, kmer_start + k + left_max_fuz + gap - prevGapEnd);
           }
-          delete[] buf;
+          // This gap has been processed
+          prevGapEnd = i;
         } else {
-          // Either left or right k-mer is not complete
-          // Add seq from end of previous gap to end of this gap
-          filledSeq = filledSeq + seq.substr(prevGapEnd, kmer_start + k + left_max_fuz + gap - prevGapEnd);
+          // No gap at position i
+          i++;
         }
-        // This gap has been processed
-        prevGapEnd = i;
-      } else {
-        // No gap at position i
-        i++;
       }
-    }
-    // Add the end of the seq
-    filledSeq = filledSeq + seq.substr(prevGapEnd, seq.length() - prevGapEnd);
+      // Add the end of the seq
+      filledSeq = filledSeq + seq.substr(prevGapEnd, seq.length() - prevGapEnd);
 
-    // Write the filled scaffold to file
-    Sequence s((char *)filledSeq.c_str());
-    s._comment = comment;
-#ifndef SINGLE_THREAD
-    {
-      LocalSynchronizer local(global_lock);
-#endif
-      output.insert(s);
-      output.flush();
-#ifndef SINGLE_THREAD
-    }
-#endif
+      // Write the filled scaffold to file
+      Sequence s((char *)filledSeq.c_str());
+      s._comment = comment;
+      {
+        LocalSynchronizer local(global_lock);
+        output.insert(s);
+        output.flush();
+      }
 #ifdef DEBUG
-    std::cout << filledSeq << std::endl;
+      std::cout << filledSeq << std::endl;
 #endif
-#ifdef SINGLE_THREAD
-  }
-#else
     }
   });
-#endif
-  output.flush();
 
+  output.flush();
   std::cout << "Filled " << filledgapcount << " gaps out of " << gapcount << std::endl;
 }
 
@@ -478,14 +458,12 @@ public:
     fprintf(stderr, "Alloc %lu bytes.\n", n * sizeof(T));
 #endif
     long long id = System::thread().getThreadSelf();
-#ifndef SINGLE_THREAD
+    
     {
       LocalSynchronizer local(global_lock);
-#endif
       memuse[id] += n * sizeof(T);
-#ifndef SINGLE_THREAD
     }
-#endif
+
     return std::allocator<T>::allocate(n, hint);
   }
 
@@ -495,14 +473,12 @@ public:
     fprintf(stderr, "Dealloc %lu bytes (%p).\n", n * sizeof(T), p);
 #endif
     long long id = System::thread().getThreadSelf();
-#ifndef SINGLE_THREAD
+    
     {
       LocalSynchronizer local(global_lock);
-#endif
       memuse[id] -= n * sizeof(T);
-#ifndef SINGLE_THREAD
     }
-#endif
+
     return std::allocator<T>::deallocate(p, n);
   }
 
@@ -954,14 +930,10 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
   const int left_half = left_max_fuz + (int)floorf((gap_len + gap_err) / 2.f);
 
   long long id = System::thread().getThreadSelf();
-#ifndef SINGLE_THREAD
   {
     LocalSynchronizer local(global_lock);
-#endif
     memuse[id] = 0;
-#ifndef SINGLE_THREAD
   }
-#endif
 
   // Border sets for breadth first search
   std::unordered_set<Node, node_hash, equal_to<Node>, count_allocator<Node>> border;
@@ -1010,14 +982,10 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
   }
 
   long long mymemuse;
-#ifndef SINGLE_THREAD
   {
     LocalSynchronizer local(global_lock);
-#endif
     mymemuse = memuse[id];
-#ifndef SINGLE_THREAD
   }
-#endif
 
   // BFS loop from the right until depth d/2+fuz is reached
   while (currentD < right_half && mymemuse < max_mem) {
@@ -1034,14 +1002,10 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
 #endif
 
     for (std::unordered_set<Node, node_hash, equal_to<Node>, count_allocator<Node>>::iterator it = border.begin(); it != border.end(); ++it) {
-#ifndef SINGLE_THREAD
       {
         LocalSynchronizer local(global_lock);
-#endif
         mymemuse = memuse[id];
-#ifndef SINGLE_THREAD
       }
-#endif
 
       if (mymemuse >= max_mem)
         break;
@@ -1070,6 +1034,7 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
           me = new map_element2(right_half);
           reachableSetRight[neighbors[i]] = me;
         }
+
         if (neighbors[i].strand == STRAND_FORWARD) {
           me->setf(currentD);
         } else {
@@ -1128,14 +1093,10 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
       }
     }
 
-#ifndef SINGLE_THREAD
     {
       LocalSynchronizer local(global_lock);
-#endif
       mymemuse = memuse[id];
-#ifndef SINGLE_THREAD
     }
-#endif
   }
 
   // Search from the left
@@ -1190,14 +1151,10 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
 
   currentD++;
 
-#ifndef SINGLE_THREAD
   {
     LocalSynchronizer local(global_lock);
-#endif
     mymemuse = memuse[id];
-#ifndef SINGLE_THREAD
   }
-#endif
 
   Node reachedTarget;
   int reachedFuz = 0;
@@ -1216,14 +1173,10 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
 #endif
 
     for (std::unordered_set<Node, node_hash, equal_to<Node>, count_allocator<Node>>::iterator it = border.begin(); it != border.end(); ++it) {
-#ifndef SINGLE_THREAD
       {
         LocalSynchronizer local(global_lock);
-#endif
         mymemuse = memuse[id];
-#ifndef SINGLE_THREAD
       }
-#endif
 
       if (mymemuse >= max_mem)
         break;
@@ -1268,14 +1221,11 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
       }
     }
 
-#ifndef SINGLE_THREAD
     {
       LocalSynchronizer local(global_lock);
-#endif
       mymemuse = memuse[id];
-#ifndef SINGLE_THREAD
     }
-#endif
+
     if (mymemuse >= max_mem)
       break;
 
@@ -1403,14 +1353,10 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
 
     currentD++;
 
-#ifndef SINGLE_THREAD
     {
       LocalSynchronizer local(global_lock);
-#endif
       mymemuse = memuse[id];
-#ifndef SINGLE_THREAD
     }
-#endif
   }
 
   if (count > 0 && pathLengths.size() > 0 && fill != NULL) {
@@ -1530,28 +1476,33 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
                   if (reachableSetLeft[n]->getf(currentD2 - 1) > 0) {
                     nextBackBorder.insert(n);
 
-                    if (node2boost.find(n) == node2boost.end())
+                    if (node2boost.find(n) == node2boost.end()){
                       node2boost[n] = boost::add_vertex(subgraph);
+                    }
 
-                    if (!boost::edge(node2boost[n], node2boost[current], subgraph).second)
+                    if (!boost::edge(node2boost[n], node2boost[current], subgraph).second) {
                       boost::add_edge(node2boost[n], node2boost[current], subgraph);
+                    }
                   }
                 } else {
                   if (reachableSetLeft[n]->getr(currentD2 - 1) > 0) {
                     nextBackBorder.insert(n);
 
-                    if (node2boost.find(n) == node2boost.end())
+                    if (node2boost.find(n) == node2boost.end()) {
                       node2boost[n] = boost::add_vertex(subgraph);
+                    }
 
-                    if (!boost::edge(node2boost[n], node2boost[current], subgraph).second)
+                    if (!boost::edge(node2boost[n], node2boost[current], subgraph).second) {
                       boost::add_edge(node2boost[n], node2boost[current], subgraph);
+                    }
                   }
                 }
               }
             }
           } else {
-            if (!boost::edge(source, node2boost[current], subgraph).second)
+            if (!boost::edge(source, node2boost[current], subgraph).second) {
               boost::add_edge(source, node2boost[current], subgraph);
+            }
           }
         }
 
@@ -1899,14 +1850,10 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
   }
 
 #ifdef STATS
-#ifndef SINGLE_THREAD
   {
     LocalSynchronizer local(global_lock);
-#endif
     std::cout << "Nodes: " << n << " Nonzeros: " << nz << " Total memory: " << memuse[id] << std::endl;
-#ifndef SINGLE_THREAD
   }
-#endif
 #endif
 
   return count;
@@ -1933,7 +1880,7 @@ std::set<Node> Gap2Seq::extract_reachable_nodes(const Graph &graph, const std::s
     for (std::set<Node>::iterator it = border.begin(); it != border.end(); ++it) {
       Node n = (Node)*it;
       reachableSet.insert(n);
-      
+
       GraphVector<Node> neighbors = graph.successors(n);
       for (size_t i = 0; i < neighbors.size(); i++) {
         nextBorder.insert(neighbors[i]);
