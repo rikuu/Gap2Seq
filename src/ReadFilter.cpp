@@ -23,7 +23,6 @@
 
 #include <string>
 #include <vector>
-#include <functional>
 
 // GATB-core Bloom filter requires hash1 function for items
 inline u_int64_t hash1(const std::string &key, u_int64_t seed = 0)

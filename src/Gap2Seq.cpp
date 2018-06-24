@@ -106,7 +106,7 @@ void print_statistics(int filledStart, int gapStart, int gapEnd,
   LocalSynchronizer local(global_lock);
 
   if (paths > 0 && (!unique_paths || paths == 1)) {
-    int filledLen = (int)strlen(&buf[left_max_fuz - left_fuz]) - k;
+    int filledLen = (int) strlen(&buf[left_max_fuz - left_fuz]) - k;
 
     int lower = 0, upper = 0;
     if (!skip_confident) {
@@ -319,8 +319,10 @@ void Gap2Seq::execute()
           more = false;
         }
       }
-      if (!more)
+
+      if (!more) {
         break;
+      }
 
       // Gap filled sequence
       std::string filledSeq = "";
@@ -356,8 +358,9 @@ void Gap2Seq::execute()
           int right_max_fuz = std::min((int)seq.size() - ((int)i + k), max_fuz);
           bool ok = i + k + right_max_fuz <= seq.size() ? true : false;
           for (int j = 0; j < k + right_max_fuz && ok; j++) {
-            if (seq[i + j] == 'N' || seq[i + j] == 'n')
+            if (seq[i + j] == 'N' || seq[i + j] == 'n') {
               ok = false;
+            }
           }
 
           // Check that the start k-mer is complete
@@ -865,24 +868,20 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
   std::unordered_map<Node, map_element2 *, node_hash, equal_to<Node>, count_allocator<std::pair<const Node, map_element2 *>>> reachableSetRight;
 
   // Rightmost starting k-mer
-  std::string kmer = kmer_right.substr(kmer_right.length() - k, k);
-  Node node = graph.buildNode(Data((char *)kmer.c_str()));
+  const std::string kmer = kmer_right.substr(kmer_right.length() - k, k);
+  Node node = graph.buildNode(kmer.c_str());
 
   // Put the rightmost k-mer into border and reachable set
   int currentD = 0;
 
   if (graph.contains(node)) {
     border.insert(node);
-    map_element2 *me = NULL;
 
-    if (reachableSetRight.find(node) != reachableSetRight.end()) {
-      me = reachableSetRight[node];
+    if (reachableSetRight.find(node) == reachableSetRight.end()) {
+      reachableSetRight[node] = new map_element2(right_half); 
     }
 
-    if (me == NULL) {
-      me = new map_element2(right_half);
-      reachableSetRight[node] = me;
-    }
+    map_element2 *me = reachableSetRight[node];
 
     // Initialize the dp row
     if (node.strand == STRAND_FORWARD) {
@@ -912,7 +911,7 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
       if (mymemuse >= max_mem)
         break;
 
-      Node n = (Node)*it;
+      Node n = (Node) *it;
 
       // Get the neightbors of the node and update their dp rows
       GraphVector<Node> neighbors = graph.predecessors(n);
@@ -922,16 +921,11 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
       bool num_paths = n.strand == STRAND_FORWARD ? node_me->getf(currentD - 1) : node_me->getr(currentD - 1);
 
       for (size_t i = 0; i < neighbors.size(); i++) {
-        map_element2 *me = NULL;
-
-        if (reachableSetRight.find(neighbors[i]) != reachableSetRight.end()) {
-          me = reachableSetRight[neighbors[i]];
+        if (reachableSetRight.find(neighbors[i]) == reachableSetRight.end()) {
+          reachableSetRight[neighbors[i]] = new map_element2(right_half);
         }
 
-        if (me == NULL) {
-          me = new map_element2(right_half);
-          reachableSetRight[neighbors[i]] = me;
-        }
+        map_element2 *me = reachableSetRight[neighbors[i]];
 
         if (neighbors[i].strand == STRAND_FORWARD) {
           me->setf(currentD);
@@ -950,21 +944,17 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
 
     // Add next starting k-mer if one still exists
     if (currentD <= right_max_fuz) {
-      std::string kmer = kmer_right.substr(kmer_right.length() - k - currentD, k);
-      Node node = graph.buildNode(Data((char *)kmer.c_str()));
+      const std::string kmer = kmer_right.substr(kmer_right.length() - k - currentD, k);
+      Node node = graph.buildNode(kmer.c_str());
 
       if (graph.contains(node)) {
         border.insert(node);
-        map_element2 *me = NULL;
 
-        if (reachableSetRight.find(node) != reachableSetRight.end()) {
-          me = reachableSetRight[node];
+        if (reachableSetRight.find(node) == reachableSetRight.end()) {
+          reachableSetRight[node] = new map_element2(right_half + left_half);
         }
 
-        if (me == NULL) {
-          me = new map_element2(right_half + left_half);
-          reachableSetRight[node] = me;
-        }
+        map_element2 *me = reachableSetRight[node];
 
         // Initialize the dp row. Note that here we initialize to 1
         // regardless of whether the node has already been reached. This
@@ -995,24 +985,19 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
   std::unordered_map<Node, map_element *, node_hash, equal_to<Node>, count_allocator<std::pair<const Node, map_element *>>> reachableSetLeft;
 
   // Leftmost starting k-mer
-  kmer = kmer_left.substr(0, k);
-  node = graph.buildNode(Data((char *)kmer.c_str()));
+  node = graph.buildNode(kmer_left.substr(0, k).c_str());
 
   // Put the leftmost k-mer into border and reachable set
   currentD = 0;
 
   if (graph.contains(node)) {
     border.insert(node);
-    map_element *me = NULL;
-
-    if (reachableSetLeft.find(node) != reachableSetLeft.end()) {
-      me = reachableSetLeft[node];
+    
+    if (reachableSetLeft.find(node) == reachableSetLeft.end()) {
+      reachableSetLeft[node] = new map_element(right_half + left_half);
     }
 
-    if (me == NULL) {
-      me = new map_element(right_half + left_half);
-      reachableSetLeft[node] = me;
-    }
+    map_element *me = reachableSetLeft[node];
 
     // Initialize the dp row
     if (node.strand == STRAND_FORWARD) {
@@ -1031,7 +1016,7 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
 
   Node reachedTarget;
   int reachedFuz = 0;
-  vector<int> pathLengths;
+  std::vector<int> pathLengths;
 
   // BFS loop until depth d/2+fuz is reached
   while (currentD <= right_half + left_half && mymemuse < max_mem) {
@@ -1050,21 +1035,17 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
       // Get the neighbors of the node and update their dp rows
       GraphVector<Node> neighbors = graph.successors(n);
       map_element *node_me = reachableSetLeft[n];
+
       // Number of paths to the parent node
       int num_paths = n.strand == STRAND_FORWARD ? node_me->getf(currentD - 1) : node_me->getr(currentD - 1);
 
       for (size_t i = 0; i < neighbors.size(); i++) {
         if (currentD < gap_len / 2 + gap_err / 2 + left_max_fuz || reachableSetRight.find(neighbors[i]) != reachableSetRight.end()) {
-          map_element *me = NULL;
-
-          if (reachableSetLeft.find(neighbors[i]) != reachableSetLeft.end()) {
-            me = reachableSetLeft[neighbors[i]];
+          if (reachableSetLeft.find(neighbors[i]) == reachableSetLeft.end()) {
+            reachableSetLeft[neighbors[i]] = new map_element(right_half + left_half);
           }
 
-          if (me == NULL) {
-            me = new map_element(right_half + left_half);
-            reachableSetLeft[neighbors[i]] = me;
-          }
+          map_element *me = reachableSetLeft[neighbors[i]];
 
           if (neighbors[i].strand == STRAND_FORWARD) {
             me->setf(currentD, me->getf(currentD) + num_paths > MAX_PATHS ? MAX_PATHS : me->getf(currentD) + num_paths);
@@ -1093,20 +1074,16 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
     // Add next starting k-mer if one still exists
     if (currentD <= left_max_fuz) {
       std::string kmer = kmer_left.substr(currentD, k);
-      Node node = graph.buildNode(Data((char *)kmer.c_str()));
+      Node node = graph.buildNode(kmer.c_str());
 
       if (graph.contains(node)) {
         border.insert(node);
-        map_element *me = NULL;
 
-        if (reachableSetLeft.find(node) != reachableSetLeft.end()) {
-          me = reachableSetLeft[node];
+        if (reachableSetLeft.find(node) == reachableSetLeft.end()) {
+          reachableSetLeft[node] = new map_element(gap_len + gap_err + left_max_fuz + right_max_fuz);  
         }
 
-        if (me == NULL) {
-          me = new map_element(gap_len + gap_err + left_max_fuz + right_max_fuz);
-          reachableSetLeft[node] = me;
-        }
+        map_element *me = reachableSetLeft[node];
 
         // Initialize the dp row. Note that here we initialize to 1
         // regardless of whether the node has already been reached. This
@@ -1126,52 +1103,52 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
 
       // Iterate over the k-mers in the right edge of the gap
       for (int j = 0; j <= right_max_fuz && count == 0; j++) {
-        std::string rkmer = kmer_right.substr(j, k);
-        reachedTarget = graph.buildNode(Data((char *)rkmer.c_str()));
-
-        map_element *right = NULL;
-
-        if (reachableSetLeft.find(reachedTarget) != reachableSetLeft.end())
-          right = reachableSetLeft[reachedTarget];
+        const std::string rkmer = kmer_right.substr(j, k);
+        reachedTarget = graph.buildNode(rkmer.c_str());
 
         // Check if this k-mer has been reached
-        if (right != NULL) {
-          // +fuz: path lengths are counted starting from the first allowed left k-mer
-          // +j: j nucleotides were ignored on the right side thus widening the gap
-          int actual_gap_len1 = gap_len + left_max_fuz + j + err;
-          int actual_gap_len2 = gap_len + left_max_fuz + j - err;
-          reachedFuz = j;
+        if (reachableSetLeft.find(reachedTarget) == reachableSetLeft.end()) {
+          continue;
+        }
 
+        map_element *right = reachableSetLeft[reachedTarget];
+        
+        // +fuz: path lengths are counted starting from the first allowed left k-mer
+        // +j: j nucleotides were ignored on the right side thus widening the gap
+        int actual_gap_len1 = gap_len + left_max_fuz + j + err;
+        int actual_gap_len2 = gap_len + left_max_fuz + j - err;
+        reachedFuz = j;
+
+        if (reachedTarget.strand == STRAND_FORWARD) {
+          if (right->getf(actual_gap_len1) >= 1) {
+            count = count + right->getf(actual_gap_len1) > MAX_PATHS ? MAX_PATHS : count + right->getf(actual_gap_len1);
+            pathLengths.push_back(actual_gap_len1);
+          }
+        } else {
+          if (right->getr(actual_gap_len1) >= 1) {
+            count = count + right->getr(actual_gap_len1) > MAX_PATHS ? MAX_PATHS : count + right->getr(actual_gap_len1);
+            pathLengths.push_back(actual_gap_len1);
+          }
+        }
+
+        if (actual_gap_len2 != actual_gap_len1 && actual_gap_len2 >= 0) {
           if (reachedTarget.strand == STRAND_FORWARD) {
-            if (right->getf(actual_gap_len1) >= 1) {
-              count = count + right->getf(actual_gap_len1) > MAX_PATHS ? MAX_PATHS : count + right->getf(actual_gap_len1);
-              pathLengths.push_back(actual_gap_len1);
+            if (right->getf(actual_gap_len2) >= 1) {
+              count = count + right->getf(actual_gap_len2) > MAX_PATHS ? MAX_PATHS : count + right->getf(actual_gap_len2);
+              pathLengths.push_back(actual_gap_len2);
             }
           } else {
-            if (right->getr(actual_gap_len1) >= 1) {
-              count = count + right->getr(actual_gap_len1) > MAX_PATHS ? MAX_PATHS : count + right->getr(actual_gap_len1);
-              pathLengths.push_back(actual_gap_len1);
-            }
-          }
-
-          if (actual_gap_len2 != actual_gap_len1 && actual_gap_len2 >= 0) {
-            if (reachedTarget.strand == STRAND_FORWARD) {
-              if (right->getf(actual_gap_len2) >= 1) {
-                count = count + right->getf(actual_gap_len2) > MAX_PATHS ? MAX_PATHS : count + right->getf(actual_gap_len2);
-                pathLengths.push_back(actual_gap_len2);
-              }
-            } else {
-              if (right->getr(actual_gap_len2) >= 1) {
-                count = count + right->getr(actual_gap_len2) > MAX_PATHS ? MAX_PATHS : count + right->getr(actual_gap_len2);
-                pathLengths.push_back(actual_gap_len2);
-              }
+            if (right->getr(actual_gap_len2) >= 1) {
+              count = count + right->getr(actual_gap_len2) > MAX_PATHS ? MAX_PATHS : count + right->getr(actual_gap_len2);
+              pathLengths.push_back(actual_gap_len2);
             }
           }
         }
       }
 
-      if (!all_paths && pathLengths.size() > 0)
+      if (!all_paths && pathLengths.size() > 0) {
         break;
+      }
     }
 
     currentD++;
@@ -1202,57 +1179,64 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
       bnode source = boost::add_vertex(subgraph);
 
       currentD2 = left_max_fuz + gap_len + gap_err + right_max_fuz;
-      if (all_paths)
+      if (all_paths) {
         count = 0;
+      }
 
       while (currentD2 >= 0) {
         // Check if there are new paths starting
         if (all_paths) {
           if (currentD2 >= left_max_fuz + gap_len - gap_err) {
             for (int j = 0; j < right_max_fuz; j++) {
-              std::string rkmer = kmer_right.substr(j, k);
-              Node rnode = graph.buildNode(Data((char *)rkmer.c_str()));
+              const std::string rkmer = kmer_right.substr(j, k);
+              Node rnode = graph.buildNode(rkmer.c_str());
 
               if (j < right_max_fuz - 1) {
-                std::string rkmer2 = kmer_right.substr(j + 1, k);
-                Node rnode2 = graph.buildNode(Data((char *)rkmer.c_str()));
+                const std::string rkmer2 = kmer_right.substr(j + 1, k);
+                Node rnode2 = graph.buildNode(rkmer.c_str());
                 if (graph.contains(rnode))
                   continue;
               }
 
-              map_element *right = NULL;
-
-              if (reachableSetLeft.find(rnode) != reachableSetLeft.end())
-                right = reachableSetLeft[rnode];
-
               // Check if this k-mer has been reached
-              if (right != NULL) {
-                if (rnode.strand == STRAND_FORWARD) {
-                  if (right->getf(currentD2) >= 1) {
-                    count = count + right->getf(currentD2) > MAX_PATHS ? MAX_PATHS : count + right->getf(currentD2);
+              if (reachableSetLeft.find(rnode) == reachableSetLeft.end()) {
+                continue;
+              }
 
-                    backBorder.insert(rnode);
-                    if (node2boost.find(rnode) == node2boost.end())
-                      node2boost[rnode] = boost::add_vertex(subgraph);
-                    if (!boost::edge(node2boost[rnode], sink, subgraph).second)
-                      boost::add_edge(node2boost[rnode], sink, subgraph);
+              map_element *right = reachableSetLeft[rnode];
+              if (rnode.strand == STRAND_FORWARD) {
+                if (right->getf(currentD2) >= 1) {
+                  count = count + right->getf(currentD2) > MAX_PATHS ? MAX_PATHS : count + right->getf(currentD2);
+
+                  backBorder.insert(rnode);
+                  
+                  if (node2boost.find(rnode) == node2boost.end()) {
+                    node2boost[rnode] = boost::add_vertex(subgraph);
                   }
-                } else {
-                  if (right->getr(currentD2) >= 1) {
-                    count = count + right->getr(currentD2) > MAX_PATHS ? MAX_PATHS : count + right->getr(currentD2);
 
-                    backBorder.insert(rnode);
-                    if (node2boost.find(rnode) == node2boost.end())
-                      node2boost[rnode] = boost::add_vertex(subgraph);
-                    if (!boost::edge(node2boost[rnode], sink, subgraph).second)
-                      boost::add_edge(node2boost[rnode], sink, subgraph);
+                  if (!boost::edge(node2boost[rnode], sink, subgraph).second) {
+                    boost::add_edge(node2boost[rnode], sink, subgraph);
+                  }
+                }
+              } else {
+                if (right->getr(currentD2) >= 1) {
+                  count = count + right->getr(currentD2) > MAX_PATHS ? MAX_PATHS : count + right->getr(currentD2);
+
+                  backBorder.insert(rnode);
+                  
+                  if (node2boost.find(rnode) == node2boost.end()) {
+                    node2boost[rnode] = boost::add_vertex(subgraph);
+                  }
+
+                  if (!boost::edge(node2boost[rnode], sink, subgraph).second) {
+                    boost::add_edge(node2boost[rnode], sink, subgraph);
                   }
                 }
               }
             }
           }
         } else {
-          for (int j = 0; j < pathLengths.size(); j++) {
+          for (size_t j = 0; j < pathLengths.size(); j++) {
             if (pathLengths[j] == currentD2) {
               backBorder.insert(reachedTarget);
 
@@ -1269,11 +1253,11 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
 
         Node lnode;
         if (currentD2 <= left_max_fuz) {
-          lnode = graph.buildNode(Data((char *)kmer_left.substr(currentD2, k).c_str()));
+          lnode = graph.buildNode(kmer_left.substr(currentD2, k).c_str());
         }
 
         for (auto it = backBorder.begin(); it != backBorder.end(); ++it) {
-          current = (Node)*it;
+          current = (Node) *it;
 
           // Check for end condition
           if (currentD2 > left_max_fuz || current != lnode) {
@@ -1285,7 +1269,7 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
                   if (reachableSetLeft[n]->getf(currentD2 - 1) > 0) {
                     nextBackBorder.insert(n);
 
-                    if (node2boost.find(n) == node2boost.end()){
+                    if (node2boost.find(n) == node2boost.end()) {
                       node2boost[n] = boost::add_vertex(subgraph);
                     }
 
@@ -1322,7 +1306,8 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
 
       std::vector<size_t> components(boost::num_vertices(subgraph));
       const size_t num_components =
-        boost::strong_components(subgraph, make_iterator_property_map(components.begin(), get(boost::vertex_index, subgraph), components[0]));
+        boost::strong_components(subgraph,
+          boost::make_iterator_property_map(components.begin(), boost::get(boost::vertex_index, subgraph)));
 
       int csize[num_components];
       for (size_t i = 0; i < num_components; i++) {
@@ -1395,13 +1380,13 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
         if (csize[components[i]] <= 1) {
           boost::graph_traits<digraph>::out_edge_iterator e, end;
           std::vector<bedge> loops;
-          for (tie(e, end) = out_edges(i, subgraph); e != end; ++e) {
+          for (boost::tie(e, end) = out_edges(i, subgraph); e != end; ++e) {
             if (boost::source(*e, subgraph) == boost::target(*e, subgraph)) {
               loops.push_back(*e);
             }
           }
 
-          for (vector<bedge>::iterator it = loops.begin(); it != loops.end(); ++it) {
+          for (std::vector<bedge>::iterator it = loops.begin(); it != loops.end(); ++it) {
             boost::remove_edge(*it, subgraph);
           }
 
@@ -1423,10 +1408,10 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
       }
 
       // Topological sorting
-      container tsorted;
+      std::vector<bnode> tsorted;
       boost::topological_sort(subgraph, std::back_inserter(tsorted));
       int branchcount = 1;
-      for (container::reverse_iterator it = tsorted.rbegin(); it != tsorted.rend(); ++it) {
+      for (std::vector<bnode>::reverse_iterator it = tsorted.rbegin(); it != tsorted.rend(); ++it) {
         const bnode n = *it;
         if (boost::in_degree(n, subgraph) >= 1 || boost::out_degree(n, subgraph) >= 1) {
           if (boost::in_degree(n, subgraph) > 1) {
@@ -1435,7 +1420,7 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
 
           branch[n] = branchcount;
 
-          if (out_degree(n, subgraph) > 1) {
+          if (boost::out_degree(n, subgraph) > 1) {
             branchcount += boost::out_degree(n, subgraph) - 1;
           }
         }
@@ -1461,7 +1446,7 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
 
       // Check for end condition
       if (currentD2 <= left_max_fuz) {
-        Node lnode = graph.buildNode(Data((char *)kmer_left.substr(currentD2, k).c_str()));
+        Node lnode = graph.buildNode(kmer_left.substr(currentD2, k).c_str());
 
         if (lnode == current) {
           *left_fuz = left_max_fuz - currentD2;
@@ -1565,24 +1550,18 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
 
 std::set<Node> Gap2Seq::extract_reachable_nodes(const Graph &graph, const std::string &kmer, int d)
 {
-  std::set<Node> border;
-  std::set<Node> nextBorder;
-  int currentD = 0;
-
-  std::set<Node> reachableSet;
-
-  Node node = graph.buildNode(Data((char *)kmer.c_str()));
-
+  const Node node = graph.buildNode(kmer.c_str());
   if (!graph.contains(node)) {
     std::cout << "Kmer " << kmer << " cannot be found in the graph!" << std::endl;
     exit(EXIT_FAILURE);
   }
-
+  
+  std::set<Node> reachableSet;
+  std::set<Node> border, nextBorder;
   border.insert(node);
-
-  while (currentD <= d) {
+  for (int currentD = 0; currentD <= d; currentD++) {
     for (std::set<Node>::iterator it = border.begin(); it != border.end(); ++it) {
-      Node n = (Node)*it;
+      Node n = (Node) *it;
       reachableSet.insert(n);
 
       GraphVector<Node> neighbors = graph.successors(n);
@@ -1593,7 +1572,6 @@ std::set<Node> Gap2Seq::extract_reachable_nodes(const Graph &graph, const std::s
 
     border.clear();
     border.swap(nextBorder);
-    currentD++;
   }
 
   return reachableSet;

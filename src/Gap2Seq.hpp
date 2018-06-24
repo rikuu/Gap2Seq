@@ -27,15 +27,12 @@
 #include <unordered_map>
 
 #include <boost/graph/adjacency_list.hpp>
-#include <boost/graph/strong_components.hpp>
-#include <boost/graph/topological_sort.hpp>
 
 #include <gatb/gatb_core.hpp>
 
 typedef boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirectionalS> digraph;
 typedef boost::graph_traits<digraph>::vertex_descriptor bnode;
 typedef boost::graph_traits<digraph>::edge_descriptor bedge;
-typedef std::vector<bnode> container;
 
 // Check if a file is readable
 inline bool is_readable(const std::string &file)

@@ -1,60 +1,42 @@
 project(Gap2Seq)
 
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.1.0)
 
 ################################################################################
-# Define cmake modules directory
+# Define the version number.
 ################################################################################
-set (GATB_CORE_HOME  ${PROJECT_SOURCE_DIR}/thirdparty/gatb-core/gatb-core)
-set (CMAKE_MODULE_PATH ${GATB_CORE_HOME}/cmake)
+SET (GAP2SEQ_VERSION_MAJOR 3)
+SET (GAP2SEQ_VERSION_MINOR 1)
+SET (GAP2SEQ_VERSION_PATCH 0)
+
+SET (GAP2SEQ_VERSION ${GAP2SEQ_VERSION_MAJOR}.${GAP2SEQ_VERSION_MINOR}.${GAP2SEQ_VERSION_PATCH})
 
 ################################################################################
 # THIRD PARTIES
 ################################################################################
 
 # We don't want to install some GATB-CORE artifacts
-#SET (GATB_CORE_EXCLUDE_TOOLS     1)
-#SET (GATB_CORE_EXCLUDE_TESTS     1)
-#SET (GATB_CORE_EXCLUDE_EXAMPLES  1)
+SET (GATB_CORE_EXCLUDE_TOOLS     1)
+SET (GATB_CORE_EXCLUDE_TESTS     1)
+SET (GATB_CORE_INCLUDE_EXAMPLES  0)
+
+SET (HTSLIB_HOME ${PROJECT_SOURCE_DIR}/thirdparty/htslib/)
+SET (GATB_CORE_HOME  ${PROJECT_SOURCE_DIR}/thirdparty/gatb-core/gatb-core)
+SET (CMAKE_MODULE_PATH ${GATB_CORE_HOME}/cmake)
 
 # GATB CORE
 include (GatbCore)
 
 ################################################################################
-# Check for lambda expressions
-################################################################################
-INCLUDE(CheckCXXSourceCompiles)
-
-IF (CMAKE_COMPILER_IS_GNUXX)
-  SET(CMAKE_REQUIRED_FLAGS "-std=c++0x")
-ELSEIF ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
-  SET(CMAKE_REQUIRED_FLAGS "-std=c++11 -stdlib=libc++")
-ENDIF ()
-
-CHECK_CXX_SOURCE_COMPILES(
-"int main(int argc, char *args[])
-{
-int ret=0;
-return ([&ret]() -> int { return ret; })();
-}
-" CXX_HAS_LAMBDA)
-
-IF (NOT CXX_HAS_LAMBDA)
-  MESSAGE (FATAL_ERROR "Lambda expressions not available. Use a newer C++ compiler (e.g. GCC Version 4.5 or greater)")
-ENDIF (NOT CXX_HAS_LAMBDA)
-
-################################################################################
 # TOOL
 ################################################################################
 
-# we get compilation definitions from the gatb-core part
 add_definitions (${gatb-core-flags})
 
-# htslib
-set (HTSLIB_HOME ${PROJECT_SOURCE_DIR}/thirdparty/htslib/)
-link_directories (${HTSLIB_HOME})
+include_directories (SYSTEM src ${gatb-core-includes} ${HTSLIB_HOME})
 
-include_directories (SYSTEM src  ${gatb-core-includes} ${HTSLIB_HOME})
+link_directories (${gatb-core-extra-libraries-path})
+link_directories (${HTSLIB_HOME})
 
 # we define the files to be compiled
 file (GLOB  GAP2SEQ_SOURCES  src/Gap2Seq.cpp src/main.cpp)
@@ -74,9 +56,8 @@ target_link_libraries ("GapCutter"  ${gatb-core-libraries})
 target_link_libraries ("GapMerger"  ${gatb-core-libraries})
 target_link_libraries ("ReadFilter"  ${gatb-core-libraries} hts)
 
-# we add a compiler flag
 set (CXX_WARNINGS "-Wall -Wextra")
-set (GCC_COMPILE_MAP_FLAGS "-std=c++0x -g")
+#set (GCC_COMPILE_MAP_FLAGS "-std=c++0x -g")
 set (CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${GCC_COMPILE_MAP_FLAGS} ${CXX_WARNINGS}")
 
 # we add the main executable script
