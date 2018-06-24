@@ -387,10 +387,6 @@ void Gap2Seq::execute()
             if (s > 0 && (!unique_paths || s == 1)) {
               filledgapcount++;
 
-#ifdef DEBUG
-              std::cout << "Fill: " << &buf[left_max_fuz - left_fuz] << std::endl;
-#endif
-
               // Add seq from end of previous gap to gap start and the gap fill sequence
               filledSeq = seq.substr(prevGapEnd, kmer_start + k + left_max_fuz - left_fuz - prevGapEnd) + (string)&buf[left_max_fuz - left_fuz];
 
@@ -428,9 +424,6 @@ void Gap2Seq::execute()
         output.insert(s);
         output.flush();
       }
-#ifdef DEBUG
-      std::cout << filledSeq << std::endl;
-#endif
     }
   });
 
@@ -454,9 +447,6 @@ public:
 
   pointer allocate(size_type n, const void *hint = 0)
   {
-#ifdef DEBUG
-    fprintf(stderr, "Alloc %lu bytes.\n", n * sizeof(T));
-#endif
     long long id = System::thread().getThreadSelf();
     
     {
@@ -469,9 +459,6 @@ public:
 
   void deallocate(pointer p, size_type n)
   {
-#ifdef DEBUG
-    fprintf(stderr, "Dealloc %lu bytes (%p).\n", n * sizeof(T), p);
-#endif
     long long id = System::thread().getThreadSelf();
     
     {
@@ -482,13 +469,7 @@ public:
     return std::allocator<T>::deallocate(p, n);
   }
 
-  count_allocator() noexcept
-  {
-#ifdef DEBUG
-    fprintf(stderr, "Hello allocator!\n");
-#endif
-  }
-
+  count_allocator() noexcept { }
   count_allocator(const count_allocator &a) noexcept {}
 
   template <typename U>
@@ -540,24 +521,12 @@ public:
     if (s_f.size() > 1 && s_f[s_f.size() - 2].first == i)
       return s_f[s_f.size() - 2].second;
 
-#ifdef DEBUG
-    for (int j = 0; j < s_f.size(); j++)
-    {
-      std::cout << "(" << s_f[j].first << "," << s_f[j].second << ") ";
-    }
-    std::cout << std::endl;
-
-    std::cout << i << std::endl;
-#endif
-
     // Binary search
-    int lo = 0;
-    int hi = s_f.size() - 1;
-    int mid = (lo + hi) / 2;
+    size_t lo = 0;
+    size_t hi = s_f.size() - 1;
+    size_t mid = (lo + hi) / 2;
+    
     while (lo <= hi) {
-#ifdef DEBUG
-      std::cout << mid << " ";
-#endif
       if (s_f[mid].first < i) {
         lo = mid + 1;
       } else if (s_f[mid].first > i) {
@@ -567,9 +536,7 @@ public:
       }
       mid = (lo + hi) / 2;
     }
-#ifdef DEBUG
-    std::cout << std::endl;
-#endif
+
     return 0;
   }
 
@@ -587,24 +554,12 @@ public:
     if (s_r.size() > 1 && s_r[s_r.size() - 2].first == i)
       return s_r[s_r.size() - 2].second;
 
-#ifdef DEBUG
-    for (int j = 0; j < s_r.size(); j++)
-    {
-      std::cout << "(" << s_r[j].first << "," << s_r[j].second << ") ";
-    }
-    std::cout << std::endl;
-
-    std::cout << i << std::endl;
-#endif
-
     // Binary search
-    int lo = 0;
-    int hi = s_r.size() - 1;
-    int mid = (lo + hi) / 2;
+    size_t lo = 0;
+    size_t hi = s_r.size() - 1;
+    size_t mid = (lo + hi) / 2;
+
     while (lo <= hi) {
-#ifdef DEBUG
-      std::cout << mid << " ";
-#endif
       if (s_r[mid].first < i) {
         lo = mid + 1;
       } else if (s_r[mid].first > i) {
@@ -614,9 +569,7 @@ public:
       }
       mid = (lo + hi) / 2;
     }
-#ifdef DEBUG
-    std::cout << std::endl;
-#endif
+
     return 0;
   }
 
@@ -741,25 +694,12 @@ public:
     if (s_f.size() > 1 && s_f[s_f.size() - 2] == i)
       return true;
 
-#ifdef DEBUG
-    for (int j = 0; j < s_f.size(); j++)
-    {
-      std::cout << s_f[j] << " ";
-    }
-    std::cout << std::endl;
-
-    std::cout << i << std::endl;
-#endif
-
     // Binary search
-    int lo = 0;
-    int hi = s_f.size() - 1;
-    int mid = (lo + hi) / 2;
-    while (lo <= hi)
-    {
-#ifdef DEBUG
-      std::cout << mid << " ";
-#endif
+    size_t lo = 0;
+    size_t hi = s_f.size() - 1;
+    size_t mid = (lo + hi) / 2;
+
+    while (lo <= hi) {
       if (s_f[mid] < i) {
         lo = mid + 1;
       } else if (s_f[mid] > i) {
@@ -769,9 +709,7 @@ public:
       }
       mid = (lo + hi) / 2;
     }
-#ifdef DEBUG
-    std::cout << std::endl;
-#endif
+
     return false;
   }
 
@@ -789,25 +727,12 @@ public:
     if (s_r.size() > 1 && s_r[s_r.size() - 2] == i)
       return true;
 
-#ifdef DEBUG
-    for (int j = 0; j < s_r.size(); j++)
-    {
-      std::cout << s_r[j] << ") ";
-    }
-    std::cout << std::endl;
-
-    std::cout << i << std::endl;
-#endif
-
     // Binary search
-    int lo = 0;
-    int hi = s_r.size() - 1;
-    int mid = (lo + hi) / 2;
-    while (lo <= hi)
-    {
-#ifdef DEBUG
-      std::cout << mid << " ";
-#endif
+    size_t lo = 0;
+    size_t hi = s_r.size() - 1;
+    size_t mid = (lo + hi) / 2;
+
+    while (lo <= hi) {
       if (s_r[mid] < i) {
         lo = mid + 1;
       } else if (s_r[mid] > i) {
@@ -817,9 +742,7 @@ public:
       }
       mid = (lo + hi) / 2;
     }
-#ifdef DEBUG
-    std::cout << std::endl;
-#endif
+
     return false;
   }
 
@@ -941,21 +864,9 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
 
   std::unordered_map<Node, map_element2 *, node_hash, equal_to<Node>, count_allocator<std::pair<const Node, map_element2 *>>> reachableSetRight;
 
-#ifdef DEBUG
-  std::cout << "Search from right end" << std::endl;
-  std::cout << "Kmer " << kmer_right << std::endl;
-#endif
-
   // Rightmost starting k-mer
   std::string kmer = kmer_right.substr(kmer_right.length() - k, k);
   Node node = graph.buildNode(Data((char *)kmer.c_str()));
-
-#ifdef DEBUG
-  if (!graph.contains(node))
-  {
-    std::cout << "Kmer " << kmer << " cannot be found in the graph!" << std::endl;
-  }
-#endif
 
   // Put the rightmost k-mer into border and reachable set
   int currentD = 0;
@@ -991,16 +902,7 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
   while (currentD < right_half && mymemuse < max_mem) {
     currentD++;
 
-#ifdef DEBUG
-    std::cout << "currentD: " << currentD << " Limit: " << right_half << std::endl;
-    std::cout << "Memuse: " << mymemuse << std::endl;
-#endif
-
     // Iterate over the nodes at current depth
-#ifdef DEBUG
-    std::cout << "Border size: " << border.size() << std::endl;
-#endif
-
     for (std::unordered_set<Node, node_hash, equal_to<Node>, count_allocator<Node>>::iterator it = border.begin(); it != border.end(); ++it) {
       {
         LocalSynchronizer local(global_lock);
@@ -1011,10 +913,6 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
         break;
 
       Node n = (Node)*it;
-
-#ifdef DEBUG
-      std::cout << graph.toString(n) << (n.strand == STRAND_FORWARD ? " F" : " R") << std::endl;
-#endif
 
       // Get the neightbors of the node and update their dp rows
       GraphVector<Node> neighbors = graph.predecessors(n);
@@ -1041,9 +939,6 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
           me->setr(currentD);
         }
 
-#ifdef DEBUG
-        std::cout << "Neighbor: " << graph.toString(neighbors[i]) << (neighbors[i].strand == STRAND_FORWARD ? " F" : " R") << std::endl;
-#endif
         // Put the neighbor to the next border
         nextBorder.insert(neighbors[i]);
       }
@@ -1057,16 +952,6 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
     if (currentD <= right_max_fuz) {
       std::string kmer = kmer_right.substr(kmer_right.length() - k - currentD, k);
       Node node = graph.buildNode(Data((char *)kmer.c_str()));
-#ifdef DEBUG
-      if (!graph.contains(node))
-      {
-        std::cout << "Kmer " << kmer_right << " cannot be found in the graph!" << std::endl;
-      }
-#endif
-
-#ifdef DEBUG
-      std::cout << "Kmer: " << kmer << std::endl;
-#endif
 
       if (graph.contains(node)) {
         border.insert(node);
@@ -1109,21 +994,9 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
   // The set of nodes reached so far
   std::unordered_map<Node, map_element *, node_hash, equal_to<Node>, count_allocator<std::pair<const Node, map_element *>>> reachableSetLeft;
 
-#ifdef DEBUG
-  std::cout << "Search from left end" << std::endl;
-  std::cout << "Kmer " << kmer_left << std::endl;
-#endif
-
   // Leftmost starting k-mer
   kmer = kmer_left.substr(0, k);
   node = graph.buildNode(Data((char *)kmer.c_str()));
-
-#ifdef DEBUG
-  if (!graph.contains(node))
-  {
-    std::cout << "Kmer " << kmer << " cannot be found in the graph!" << std::endl;
-  }
-#endif
 
   // Put the leftmost k-mer into border and reachable set
   currentD = 0;
@@ -1162,16 +1035,7 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
 
   // BFS loop until depth d/2+fuz is reached
   while (currentD <= right_half + left_half && mymemuse < max_mem) {
-#ifdef DEBUG
-    std::cout << "currentD: " << currentD << " Limit: " << right_half + left_half << std::endl;
-    std::cout << "Memuse: " << mymemuse << std::endl;
-#endif
-
     // Iterate over the nodes at current depth
-#ifdef DEBUG
-    std::cout << "Border size: " << border.size() << std::endl;
-#endif
-
     for (std::unordered_set<Node, node_hash, equal_to<Node>, count_allocator<Node>>::iterator it = border.begin(); it != border.end(); ++it) {
       {
         LocalSynchronizer local(global_lock);
@@ -1182,10 +1046,6 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
         break;
 
       Node n = (Node)*it;
-
-#ifdef DEBUG
-      std::cout << graph.toString(n) << (n.strand == STRAND_FORWARD ? " F" : " R") << std::endl;
-#endif
 
       // Get the neighbors of the node and update their dp rows
       GraphVector<Node> neighbors = graph.successors(n);
@@ -1212,9 +1072,6 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
             me->setr(currentD, me->getr(currentD) + num_paths > MAX_PATHS ? MAX_PATHS : me->getr(currentD) + num_paths);
           }
 
-#ifdef DEBUG
-          std::cout << "Neighbor: " << graph.toString(neighbors[i]) << (neighbors[i].strand == STRAND_FORWARD ? " F" : " R") << std::endl;
-#endif
           // Put the neighbor to the next border
           nextBorder.insert(neighbors[i]);
         }
@@ -1237,16 +1094,6 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
     if (currentD <= left_max_fuz) {
       std::string kmer = kmer_left.substr(currentD, k);
       Node node = graph.buildNode(Data((char *)kmer.c_str()));
-#ifdef DEBUG
-      if (!graph.contains(node))
-      {
-        std::cout << "Kmer " << kmer << " cannot be found in the graph!" << std::endl;
-      }
-#endif
-
-#ifdef DEBUG
-      std::cout << "Kmer: " << kmer << std::endl;
-#endif
 
       if (graph.contains(node)) {
         border.insert(node);
@@ -1282,25 +1129,13 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
         std::string rkmer = kmer_right.substr(j, k);
         reachedTarget = graph.buildNode(Data((char *)rkmer.c_str()));
 
-#ifdef DEBUG
-        std::cout << "Right k-mer: " << graph.toString(reachedTarget) << std::endl;
-        if (!graph.contains(reachedTarget))
-        {
-          std::cout << "Kmer " << kmer_right << " cannot be found in the graph!" << std::endl;
-        }
-#endif
-
         map_element *right = NULL;
 
         if (reachableSetLeft.find(reachedTarget) != reachableSetLeft.end())
           right = reachableSetLeft[reachedTarget];
 
         // Check if this k-mer has been reached
-        if (right == NULL) {
-#ifdef DEBUG
-          std::cout << "right kmer not reached" << std::endl;
-#endif
-        } else {
+        if (right != NULL) {
           // +fuz: path lengths are counted starting from the first allowed left k-mer
           // +j: j nucleotides were ignored on the right side thus widening the gap
           int actual_gap_len1 = gap_len + left_max_fuz + j + err;
@@ -1310,17 +1145,11 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
           if (reachedTarget.strand == STRAND_FORWARD) {
             if (right->getf(actual_gap_len1) >= 1) {
               count = count + right->getf(actual_gap_len1) > MAX_PATHS ? MAX_PATHS : count + right->getf(actual_gap_len1);
-#ifdef DEBUG
-              std::cout << "Gap filled: " << actual_gap_len1 << "\t" << right->getf(actual_gap_len1) << std::endl;
-#endif
               pathLengths.push_back(actual_gap_len1);
             }
           } else {
             if (right->getr(actual_gap_len1) >= 1) {
               count = count + right->getr(actual_gap_len1) > MAX_PATHS ? MAX_PATHS : count + right->getr(actual_gap_len1);
-#ifdef DEBUG
-              std::cout << "Gap filled: " << actual_gap_len1 << "\t" << right->getr(actual_gap_len1) << std::endl;
-#endif
               pathLengths.push_back(actual_gap_len1);
             }
           }
@@ -1329,17 +1158,11 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
             if (reachedTarget.strand == STRAND_FORWARD) {
               if (right->getf(actual_gap_len2) >= 1) {
                 count = count + right->getf(actual_gap_len2) > MAX_PATHS ? MAX_PATHS : count + right->getf(actual_gap_len2);
-#ifdef DEBUG
-                std::cout << "Gap filled: " << actual_gap_len2 << "\t" << right->getf(actual_gap_len2) << std::endl;
-#endif
                 pathLengths.push_back(actual_gap_len2);
               }
             } else {
               if (right->getr(actual_gap_len2) >= 1) {
                 count = count + right->getr(actual_gap_len2) > MAX_PATHS ? MAX_PATHS : count + right->getr(actual_gap_len2);
-#ifdef DEBUG
-                std::cout << "Gap filled: " << actual_gap_len2 << "\t" << right->getr(actual_gap_len2) << std::endl;
-#endif
                 pathLengths.push_back(actual_gap_len2);
               }
             }
@@ -1378,9 +1201,6 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
       bnode sink = boost::add_vertex(subgraph);
       bnode source = boost::add_vertex(subgraph);
 
-#ifdef DEBUG
-      std::cout << "PathLengthSize: " << pathLengths.size() << std::endl;
-#endif
       currentD2 = left_max_fuz + gap_len + gap_err + right_max_fuz;
       if (all_paths)
         count = 0;
@@ -1400,30 +1220,17 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
                   continue;
               }
 
-#ifdef DEBUG
-              std::cout << "Right k-mer: " << graph.toString(rnode) << std::endl;
-              if (!graph.contains(rnode))
-              {
-                std::cout << "Kmer " << kmer_right << " cannot be found in the graph!" << std::endl;
-              }
-#endif
               map_element *right = NULL;
 
               if (reachableSetLeft.find(rnode) != reachableSetLeft.end())
                 right = reachableSetLeft[rnode];
 
               // Check if this k-mer has been reached
-              if (right == NULL) {
-#ifdef DEBUG
-                std::cout << "right kmer not reached" << std::endl;
-#endif
-              } else {
+              if (right != NULL) {
                 if (rnode.strand == STRAND_FORWARD) {
                   if (right->getf(currentD2) >= 1) {
                     count = count + right->getf(currentD2) > MAX_PATHS ? MAX_PATHS : count + right->getf(currentD2);
-#ifdef DEBUG
-                    std::cout << "Gap filled: " << currentD2 << "\t" << right->getf(currentD2) << std::endl;
-#endif
+
                     backBorder.insert(rnode);
                     if (node2boost.find(rnode) == node2boost.end())
                       node2boost[rnode] = boost::add_vertex(subgraph);
@@ -1433,9 +1240,7 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
                 } else {
                   if (right->getr(currentD2) >= 1) {
                     count = count + right->getr(currentD2) > MAX_PATHS ? MAX_PATHS : count + right->getr(currentD2);
-#ifdef DEBUG
-                    std::cout << "Gap filled: " << currentD2 << "\t" << right->getr(currentD2) << std::endl;
-#endif
+
                     backBorder.insert(rnode);
                     if (node2boost.find(rnode) == node2boost.end())
                       node2boost[rnode] = boost::add_vertex(subgraph);
@@ -1450,10 +1255,14 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
           for (int j = 0; j < pathLengths.size(); j++) {
             if (pathLengths[j] == currentD2) {
               backBorder.insert(reachedTarget);
-              if (node2boost.find(reachedTarget) == node2boost.end())
+
+              if (node2boost.find(reachedTarget) == node2boost.end()) {
                 node2boost[reachedTarget] = boost::add_vertex(subgraph);
-              if (!boost::edge(node2boost[reachedTarget], sink, subgraph).second)
+              }
+
+              if (!boost::edge(node2boost[reachedTarget], sink, subgraph).second) {
                 boost::add_edge(node2boost[reachedTarget], sink, subgraph);
+              }
             }
           }
         }
@@ -1511,76 +1320,9 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
         currentD2--;
       }
 
-      /*
-      backBorder.insert(reachedTarget);
-      node2boost[reachedTarget] = boost::add_vertex(subgraph);
-      boost::add_edge(node2boost[reachedTarget], sink, subgraph);
-
-
-      for (size_t j = 0; j < pathLengths.size(); j++) {
-	backBorder.clear();
-	nextBackBorder.clear();
-	backBorder.insert(reachedTarget);
-	current = reachedTarget;
-	currentD2 = pathLengths[j];
-
-	while(currentD2 >= 0) {
-	  Node lnode;
-	  if (currentD2 <= left_max_fuz) {
-	    lnode = graph.buildNode(Data((char *)kmer_left.substr(currentD2,k).c_str()));
-	  }
-	  for(auto it = backBorder.begin(); it != backBorder.end(); ++it) {
-	    current = (Node) *it;
-
-	    // Check for end condition
-	    if (currentD2 > left_max_fuz || current != lnode) {
-	      GraphVector<Node> neighbors = graph.predecessors(current);
-	      for (size_t i = 0; i < neighbors.size(); i++) {
-		Node n = neighbors[i];
-		if (reachableSetLeft.find(n) != reachableSetLeft.end()) {
-		  if (n.strand == STRAND_FORWARD) {
-		    if (reachableSetLeft[n]->getf(currentD2-1) > 0) {
-		      nextBackBorder.insert(n);
-		      if (node2boost.find(n) == node2boost.end())
-			node2boost[n] = boost::add_vertex(subgraph);
-		      if (!boost::edge(node2boost[n], node2boost[current], subgraph).second) {
-			boost::add_edge(node2boost[n], node2boost[current], subgraph);
-		      }
-		    }
-		  } else {
-		    if (reachableSetLeft[n]->getr(currentD2-1) > 0) {
-		      nextBackBorder.insert(n);
-		      if (node2boost.find(n) == node2boost.end())
-			node2boost[n] = boost::add_vertex(subgraph);
-		      if (!boost::edge(node2boost[n], node2boost[current], subgraph).second) {
-			boost::add_edge(node2boost[n], node2boost[current], subgraph);
-		      }
-		    }
-		  }
-		}
-	      }
-	    } else {
-	      if (!boost::edge(source, node2boost[current], subgraph).second) {
-		boost::add_edge(source, node2boost[current], subgraph);
-	      }
-	    }
-	  }
-
-	  backBorder.clear();
-	  backBorder.swap(nextBackBorder);
-	  currentD2--;
-	}
-      }
-      */
-
       std::vector<size_t> components(boost::num_vertices(subgraph));
       const size_t num_components =
         boost::strong_components(subgraph, make_iterator_property_map(components.begin(), get(boost::vertex_index, subgraph), components[0]));
-
-#ifdef DEBUG
-      std::cout << "Size of the path subgraph: " << boost::num_vertices(subgraph) << " / " << boost::num_edges(subgraph) << std::endl;
-      std::cout << "Strongly connected components: " << num_components << std::endl;
-#endif
 
       int csize[num_components];
       for (size_t i = 0; i < num_components; i++) {
@@ -1593,9 +1335,6 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
       size_t size_nontrivial_components = 0;
 
       if (num_components != num_real_vertices) {
-#ifdef DEBUG
-        std::cout << "Subgraph contains cycles" << std::endl;
-#endif
         for (size_t i = 0; i < num_real_vertices; i++) {
           csize[components[i]]++;
         }
@@ -1701,10 +1440,6 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
           }
         }
       }
-
-#ifdef DEBUG
-      boost::write_graphviz(std::cout, subgraph, boost::make_label_writer(branch));
-#endif
     }
 
     // Recover the fill sequence
@@ -1724,16 +1459,10 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
       // The current k-mer
       std::string str = graph.toString(current);
 
-#ifdef DEBUG
-      std::cout << str << std::endl;
-#endif
-
       // Check for end condition
       if (currentD2 <= left_max_fuz) {
         Node lnode = graph.buildNode(Data((char *)kmer_left.substr(currentD2, k).c_str()));
-#ifdef DEBUG
-        std::cout << kmer_left << " " << graph.toString(lnode) << " " << graph.toString(current) << std::endl;
-#endif
+
         if (lnode == current) {
           *left_fuz = left_max_fuz - currentD2;
           break;
@@ -1799,31 +1528,6 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
       delete[] branch;
     }
   }
-
-#ifdef DEBUG
-  std::cout << std::endl;
-#endif
-
-#ifdef DEBUG
-  std::cout << "Reachable set: " << std::endl;
-  for (auto it = reachableSetRight.begin(); it != reachableSetRight.end(); ++it) {
-    std::cout << graph.toString(it->first) << std::endl;
-    for (int i = 0; i <= gap_len + gap_err + left_max_fuz + right_max_fuz; i++) {
-      if (it->first.strand == STRAND_FORWARD) {
-        std::cout << " " << (it->second)->getf(i);
-      } else {
-        std::cout << " " << (it->second)->getr(i);
-      }
-    }
-    std::cout << std::endl;
-  }
-#endif
-
-#ifdef DEBUG
-  if (mymemuse > max_mem) {
-    std::cout << "Memory limit exceeded - giving up on this gap." << std::endl;
-  }
-#endif
 
   // Check for memory usage to set count accordingly
   if (mymemuse > max_mem)
