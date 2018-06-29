@@ -325,7 +325,7 @@ def cut_vcf(vcf, reference_file, k, fuz, contigs_file = 'tmp.contigs',
         comment, start, end = fields[0], int(fields[1]) - 1, \
             (int(fields[1]) - 1) + (len(insert) - 1)
 
-        # Extract kmers from reference seqeuences
+        # Extract k-mers from reference seqeuences
         left_end = min(start+k+fuz, len(reference[comment]))
         right_start = max(end-(k+fuz), 0)
         left = reference[comment][start:left_end]
@@ -355,7 +355,7 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description='Gap2Seq 3.1')
 
-    # filler.py specific arguments
+    # wrapper specific arguments
     parser.add_argument('-f', '--filled', required=True, type=str, help="output file for filled scaffolds")
     parser.add_argument('-t', '--threads', type=int, default=1, help="number of threads to use")
     parser.add_argument('--insertion', action='store_true', help=argparse.SUPPRESS)

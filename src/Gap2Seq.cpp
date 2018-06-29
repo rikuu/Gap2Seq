@@ -32,7 +32,7 @@
 
 #include <gatb/gatb_core.hpp>
 
-#include <Gap2Seq.hpp>
+#include "Gap2Seq.hpp"
 
 // Maximum number of paths for counting
 #define MAX_PATHS (INT_MAX / 2 - 1)
@@ -230,7 +230,7 @@ void Gap2Seq::execute()
     const int length = getInput()->getInt(STR_LENGTH);
 
     // TODO: Also check for Ns in flanks
-    if (left_flank.length() < k || right_flank.length() < k) {
+    if ((int)left_flank.length() < k || (int)right_flank.length() < k) {
       std::cerr << "Flanks need to be at least k length" << std::endl;
       return;
     }
@@ -302,7 +302,7 @@ void Gap2Seq::execute()
 
   Range<int>::Iterator intIt(1, d->getExecutionUnitsNumber());
   itSeq.first();
-  IDispatcher::Status status = d->iterate(intIt, [&](int id) {
+  d->iterate(intIt, [&](int id) {
     bool more = true;
 
     while (more) {
@@ -918,7 +918,7 @@ int Gap2Seq::fill_gap(const Graph &graph, const std::string &kmer_left, const st
       map_element2 *node_me = reachableSetRight[n];
 
       // Number of paths to the parent node
-      bool num_paths = n.strand == STRAND_FORWARD ? node_me->getf(currentD - 1) : node_me->getr(currentD - 1);
+      // bool num_paths = n.strand == STRAND_FORWARD ? node_me->getf(currentD - 1) : node_me->getr(currentD - 1);
 
       for (size_t i = 0; i < neighbors.size(); i++) {
         if (reachableSetRight.find(neighbors[i]) == reachableSetRight.end()) {

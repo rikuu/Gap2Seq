@@ -20,7 +20,7 @@
 *****************************************************************************/
 
 // We include the header file for the tool
-#include <Gap2Seq.hpp>
+#include "Gap2Seq.hpp"
 
 int main(int argc, char *argv[])
 {

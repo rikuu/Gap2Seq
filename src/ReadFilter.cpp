@@ -27,6 +27,7 @@
 // GATB-core Bloom filter requires hash1 function for items
 inline u_int64_t hash1(const std::string &key, u_int64_t seed = 0)
 {
+  (void) seed;
   return std::hash<std::string>{}(key);
 }
 
@@ -48,7 +49,7 @@ static const char *STR_GAP_BREAKPOINT = "-breakpoint";
 static const char *STR_FLANK_LENGTH = "-flank-length";
 
 static const char *STR_GAP_LENGTH = "-gap-length";
-static const char *STR_THRESHOLD = "-unmapped";
+// static const char *STR_THRESHOLD = "-unmapped";
 
 static const char *STR_ONLY_UNMAPPED = "-unmapped-only";
 
