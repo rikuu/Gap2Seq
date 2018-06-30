@@ -14,9 +14,19 @@ find_package(Boost REQUIRED COMPONENTS graph)
 include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
 file(REMOVE_RECURSE ${GATB_CORE_HOME}/thirdparty/boost)
 
-set(HTSLIB_HOME ${PROJECT_SOURCE_DIR}/thirdparty/htslib)
-include_directories(BEFORE SYSTEM ${HTSLIB_HOME})
-link_directories(${HTSLIB_HOME})
+set(SYSTEM_HTSLIB 0)
+set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/thirdparty)
+find_package(Htslib)
+if(${HTSLIB_FOUND} AND ${SYSTEM_HTSLIB})
+    message("-- Using system htslib")
+    include_directories(BEFORE SYSTEM ${HTSLIB_INCLUDE_DIRS})
+    link_directories(${HTSLIB_LIBRARY_DIRS})
+else()
+    message("-- Using bundled htslib")
+    set(HTSLIB_HOME ${PROJECT_SOURCE_DIR}/thirdparty/htslib)
+    include_directories(BEFORE SYSTEM ${HTSLIB_HOME})
+    link_directories(${HTSLIB_HOME})
+endif()
 
 # GATB CORE
 set(GATB_CORE_EXCLUDE_TOOLS 1)
@@ -45,7 +55,7 @@ target_link_libraries("GapMerger" ${gatb-core-libraries})
 target_link_libraries("ReadFilter" ${gatb-core-libraries} hts)
 
 set(CXX_WARNINGS "-Wall") # -Wextra
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX_WARNINGS}")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX_WARNINGS} -g")
 
 # we add the main executable script
 configure_file("${CMAKE_SOURCE_DIR}/src/Gap2Seq.py" "${CMAKE_CURRENT_BINARY_DIR}/Gap2Seq" COPYONLY)
