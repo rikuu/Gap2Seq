@@ -220,6 +220,29 @@ def fill_gap(libraries, gap, k, fuz, solid, derr, max_mem, randseed,
     else:
         return (successful, gap.comment, fill)
 
+# Run Gap2Seq without read filtering, i.e. just feed all scaffolds to it
+# FIXME: This is an ugly way to implement this, don't copy-paste code
+def fill_scaffolds(scaffolds, filled, k, fuz, solid, derr, max_mem, randseed,
+        upper, unique, best, reads, threads):
+
+    if type(scaffolds) != type(''):
+        scaffolds = scaffolds.name
+
+    binary_options = [option for option, on in [('-all-upper', upper), ('-unique', unique), ('-best-only', best)] if on]
+    with open('tmp.gap2seq.log', 'w') as f:
+        subprocess.check_call([GAP2SEQ,
+            '-k', str(k),
+            '-fuz', str(fuz),
+            '-solid', str(solid),
+            '-nb-cores', str(threads),
+            '-dist-error', str(derr),
+            '-max-mem', str(max_mem),
+            '-randseed', str(randseed),
+            '-reads', ','.join(reads),
+            '-filled', filled,
+            '-scaffolds', scaffolds] + binary_options,
+            stdout=f, stderr=f)
+
 # NOTE: Assumes gaps and the bed file are in the same order
 def parse_gap(bed, gap, id, insertion=False):
     gap = gap.split('\n')
@@ -435,42 +458,47 @@ if __name__ == '__main__':
 
     count_gaps(args['bed'])
 
-    # Gap2Seq divides the max mem evenly between threads, but as we run multiple
-    # parallel instances with 1 thread, we need to pre-divide
-    max_mem = args['max_mem'] / args['threads']
-
-    queue, pool = None, None
-    if args['threads'] > 1:
-        manager = multiprocessing.Manager()
-        queue = manager.Queue()
-        pool = multiprocessing.Pool(args['threads'] + 1)
-
-    # Start listening for filled gaps
-    if args['threads'] > 1:
-        res = pool.apply_async(listener, (queue, args['filled']))
-
-    print('Starting gapfillers')
-    jobs = start_fillers(args['bed'], args['gaps'], libraries, queue=queue,
-        pool=pool, k=args['k'], fuz=args['fuz'], solid=args['solid'],
-        derr=args['dist_error'], max_mem=max_mem, reads=args['reads'],
-        randseed=args['randseed'], upper=args['all_upper'],
-        unique=args['unique'], best=args['best_only'],
-        insertion=args['insertion'])
-
-    args['bed'].close()
-    args['gaps'].close()
-
-    if args['threads'] > 1:
-        for job in jobs:
-            job.get()
-        queue.put('kill')
-        successful_gaps = res.get(timeout=1)
-        pool.close()
-        pool.join()
-
-    # Cleanup unmapped reads
     if args['libraries'] != None:
+        # Gap2Seq divides the max mem evenly between threads, but as we run multiple
+        # parallel instances with 1 thread, we need to pre-divide
+        max_mem = args['max_mem'] / args['threads']
+
+        queue, pool = None, None
+        if args['threads'] > 1:
+            manager = multiprocessing.Manager()
+            queue = manager.Queue()
+            pool = multiprocessing.Pool(args['threads'] + 1)
+
+        # Start listening for filled gaps
+        if args['threads'] > 1:
+            res = pool.apply_async(listener, (queue, args['filled']))
+
+        print('Starting gapfillers')
+        jobs = start_fillers(args['bed'], args['gaps'], libraries, queue=queue,
+            pool=pool, k=args['k'], fuz=args['fuz'], solid=args['solid'],
+            derr=args['dist_error'], max_mem=max_mem, reads=args['reads'],
+            randseed=args['randseed'], upper=args['all_upper'],
+            unique=args['unique'], best=args['best_only'],
+            insertion=args['insertion'])
+
+        args['bed'].close()
+        args['gaps'].close()
+
+        if args['threads'] > 1:
+            for job in jobs:
+                job.get()
+            queue.put('kill')
+            successful_gaps = res.get(timeout=1)
+            pool.close()
+            pool.join()
+
+        # Cleanup unmapped reads
         subprocess.check_call(['rm', '-f', 'tmp.reads.*.unmapped'])
+    else:
+        fill_scaffolds(args['gaps'], args['filled'], args['k'], args['fuz'],
+            args['solid'], args['dist_error'], args['max_mem'],
+            args['randseed'], args['all_upper'], args['unique'],
+            args['best_only'], args['reads'], args['threads'])
 
     if scaffolds_cut:
         print('Merging filled gaps and contigs')

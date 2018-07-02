@@ -8,15 +8,13 @@ by variant calling tools.
 
 ## Reference
 
-L. Salmela, K. Sahlin, V. Mäkinen, and A.I. Tomescu: Gap filling as exact path
-length problem. In Proc. RECOMB 2015, LNBI 9029, Springer 2015, pp. 281-292.
+[L. Salmela, K. Sahlin, V. Mäkinen, and A.I. Tomescu: Gap filling as exact path length problem. In Proc. RECOMB 2015, LNBI 9029, Springer 2015, pp. 281-292.](http://dx.doi.org/10.1007/978-3-319-16706-0_29)
 
-L. Salmela, A.I. Tomescu: Safely filling gaps with partial solutions common to
-all solutions. In Proc. WABI 2016, LNBI 9838, Springer 2016, xiv, short
-abstract.
+[L. Salmela, A.I. Tomescu: Safely filling gaps with partial solutions common to all solutions. In Proc. WABI 2016, LNBI 9838, Springer 2016, xiv, short abstract.](http://link.springer.com/content/pdf/bfm%3A978-3-319-43681-4%2F1.pdf)
 
-[R. Walve, L. Salmela, V. Mäkinen: Variant genotyping with gap filling. In PLoS
-ONE 12(9): e0184608.](https://doi.org/10.1371/journal.pone.0184608)
+[L. Salmela and A.I. Tomescu: Safely filling gaps with partial solutions common to all solutions. To appear in TCBB.](https://doi.org/10.1109/TCBB.2017.2785831)
+
+[R. Walve, L. Salmela, V. Mäkinen: Variant genotyping with gap filling. In PLoS ONE 12(9): e0184608.](https://doi.org/10.1371/journal.pone.0184608)
 
 ## Requirements
 
@@ -155,7 +153,10 @@ genotyping.
 Unmapped reads are now filtered from alignments only once per read library.
 Speeds up gap filling around 30% for large scaffolds.
 
-Updated to GATB-core 1.4.1
+Using the wrapper script without alignments now correctly delegates all
+processing to Gap2Seq-core.
+
+Updated to GATB-core 1.4.1 and HTSlib to 1.8.
 
 ### Version 3.0
 

@@ -172,10 +172,7 @@ void GapMerger::execute()
     const std::string contig = contigIter->toString();
 
     const int contigScaffoldIndex = parseScaffoldIndex(comment);
-    const int contigIndex = parseContigIndex(comment);
     const int gapIndex = parseGapIndex(comment);
-
-    assert(contigIndex == contigs);
     contigs++;
 
     // Scaffold done, write to file
@@ -213,10 +210,6 @@ void GapMerger::execute()
               const int splitLength = std::stoi(gapIter->getComment().substr(markerPos + SPLIT_MARKER_LENGTH + 2));
               second = gapIter->toString().substr(splitLength);
             }
-
-#ifdef DEBUG
-            std::cout << "first: " << first << " second: " << second << std::endl;
-#endif
 
             if (first != "" && second != "") {
               break;

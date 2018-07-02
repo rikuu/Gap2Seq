@@ -54,7 +54,7 @@ target_link_libraries("GapCutter" ${gatb-core-libraries})
 target_link_libraries("GapMerger" ${gatb-core-libraries})
 target_link_libraries("ReadFilter" ${gatb-core-libraries} hts)
 
-set(CXX_WARNINGS "-Wall") # -Wextra
+# set(CXX_WARNINGS "-Wall -Wextra")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX_WARNINGS} -g")
 
 # we add the main executable script
