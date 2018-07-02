@@ -218,7 +218,7 @@ void Gap2Seq::execute()
     }
   }
 
-  std::cout << graph.getInfo() << std::endl;
+  // std::cout << graph.getInfo() << std::endl;
 
   // Open the output scaffold file
   BankFasta output(filled_scaffolds);
@@ -294,6 +294,7 @@ void Gap2Seq::execute()
   // Synchronization for output (both file and stdout)
   global_lock = System::thread().newSynchronizer();
   IDispatcher *d = getDispatcher();
+
   // Default group size is too big (one thread will do all the work...)
   d->setGroupSize(1);
 
@@ -301,8 +302,7 @@ void Gap2Seq::execute()
   std::cout << "Max mem: " << max_mem << std::endl;
 
   Range<int>::Iterator intIt(1, d->getExecutionUnitsNumber());
-  itSeq.first();
-  d->iterate(intIt, [&](int id) {
+  auto status = d->iterate(intIt, [&](int id) {
     bool more = true;
 
     while (more) {
