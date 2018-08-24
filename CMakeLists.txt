@@ -8,11 +8,18 @@ cmake_minimum_required(VERSION 3.1.0)
 
 set(GATB_CORE_HOME ${PROJECT_SOURCE_DIR}/thirdparty/gatb-core/gatb-core)
 
-# GATB-core includes parts of boost (critically not graph) which likely
-# conflicts with whatever version we can find
-find_package(Boost REQUIRED COMPONENTS graph)
-include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
-file(REMOVE_RECURSE ${GATB_CORE_HOME}/thirdparty/boost)
+# Some environments seem to have trouble finding boost_graph, even when it exists
+# find_package(Boost REQUIRED COMPONENTS graph)
+find_package(Boost)
+if(Boost_FOUND)
+    include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
+
+    # GATB-core includes parts of boost (critically not graph) which likely
+    # conflicts with whatever version we can find
+    file(REMOVE_RECURSE ${GATB_CORE_HOME}/thirdparty/boost)
+else()
+    message(FATAL_ERROR "-- Boost::Graph required!")
+endif()
 
 set(SYSTEM_HTSLIB 0)
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/thirdparty)
@@ -54,8 +61,8 @@ target_link_libraries("GapCutter" ${gatb-core-libraries})
 target_link_libraries("GapMerger" ${gatb-core-libraries})
 target_link_libraries("ReadFilter" ${gatb-core-libraries} hts)
 
-# set(CXX_WARNINGS "-Wall -Wextra")
+set(CXX_WARNINGS "") #"-Wall -Wextra")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX_WARNINGS} -g")
 
-# we add the main executable script
+# copy the wrapper script
 configure_file("${CMAKE_SOURCE_DIR}/src/Gap2Seq.py" "${CMAKE_CURRENT_BINARY_DIR}/Gap2Seq" COPYONLY)
