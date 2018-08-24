@@ -31,9 +31,18 @@ inline u_int64_t hash1(const std::string &key, u_int64_t seed = 0)
   return std::hash<std::string>{}(key);
 }
 
-#include <gatb/gatb_core.hpp>
+#include <gatb/tools/misc/impl/Tool.hpp>
+#include <gatb/tools/collections/impl/Bloom.hpp>
+#include <gatb/bank/impl/BankFasta.hpp>
 
 #include <htslib/sam.h>
+
+using namespace gatb::core::tools::misc;
+using namespace gatb::core::tools::misc::impl;
+using namespace gatb::core::tools::collections;
+using namespace gatb::core::tools::collections::impl;
+using namespace gatb::core::bank;
+using namespace gatb::core::bank::impl;
 
 /*****************************************************************************/
 
@@ -47,9 +56,7 @@ static const char *STR_SCAFFOLD = "-scaffold";
 static const char *STR_GAP_BREAKPOINT = "-breakpoint";
 
 static const char *STR_FLANK_LENGTH = "-flank-length";
-
 static const char *STR_GAP_LENGTH = "-gap-length";
-// static const char *STR_THRESHOLD = "-unmapped";
 
 static const char *STR_ONLY_UNMAPPED = "-unmapped-only";
 
@@ -221,7 +228,7 @@ uint64_t count_reads(const std::string &filename, int32_t *read_length)
   int32_t max_length = 0;
   while (iter.next()) {
     count++;
-    max_length = max(max_length, iter.bam->core.l_qseq);
+    max_length = (iter.bam->core.l_qseq > max_length) ? iter.bam->core.l_qseq : max_length;
   }
 
   io.unload();
@@ -409,12 +416,6 @@ void ReadFilter::execute()
 
 int main(int argc, char *argv[])
 {
-  try {
-    ReadFilter().run(argc, argv);
-  } catch (Exception &e) {
-    std::cout << "EXCEPTION: " << e.getMessage() << std::endl;
-    return EXIT_FAILURE;
-  }
-
+  ReadFilter().run(argc, argv);
   return EXIT_SUCCESS;
 }
