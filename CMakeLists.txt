@@ -21,18 +21,21 @@ else()
     message(FATAL_ERROR "-- Boost::Graph required!")
 endif()
 
-set(SYSTEM_HTSLIB 0)
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/thirdparty)
+set(HTSLIB_HOME ${PROJECT_SOURCE_DIR}/thirdparty/htslib)
 find_package(Htslib)
-if(${HTSLIB_FOUND} AND ${SYSTEM_HTSLIB})
+if(${HTSLIB_FOUND} AND DEFINED SYSTEM_HTSLIB)
     message("-- Using system htslib")
     include_directories(BEFORE SYSTEM ${HTSLIB_INCLUDE_DIRS})
     link_directories(${HTSLIB_LIBRARY_DIRS})
+    set(htslib-library hts)
 else()
     message("-- Using bundled htslib")
-    set(HTSLIB_HOME ${PROJECT_SOURCE_DIR}/thirdparty/htslib)
     include_directories(BEFORE SYSTEM ${HTSLIB_HOME})
-    link_directories(${HTSLIB_HOME})
+    # link_directories(${HTSLIB_HOME})
+
+    # Static link when using bundled htslib, for distributability
+    set(htslib-library ${HTSLIB_HOME}/libhts.a)
 endif()
 
 # GATB CORE
@@ -59,9 +62,9 @@ add_executable("ReadFilter" src/ReadFilter.cpp)
 target_link_libraries("Gap2Seq-core" ${gatb-core-libraries})
 target_link_libraries("GapCutter" ${gatb-core-libraries})
 target_link_libraries("GapMerger" ${gatb-core-libraries})
-target_link_libraries("ReadFilter" ${gatb-core-libraries} hts)
+target_link_libraries("ReadFilter" ${gatb-core-libraries} ${htslib-library})
 
-set(CXX_WARNINGS "") #"-Wall -Wextra")
+# set(CXX_WARNINGS -Wall -Wextra")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX_WARNINGS} -g")
 
 # copy the wrapper script
