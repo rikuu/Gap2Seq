@@ -22,7 +22,6 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ##############################################################################
 
-from __future__ import print_function
 import os, sys
 import subprocess, multiprocessing
 import datetime, random
@@ -221,7 +220,7 @@ def fill_gap(libraries, gap, k, fuz, solid, derr, max_mem, randseed,
         return (successful, gap.comment, fill)
 
 # Run Gap2Seq without read filtering, i.e. just feed all scaffolds to it
-# FIXME: This is an ugly way to implement this, don't copy-paste code
+# FIXME: This is an ugly way to implement this
 def fill_scaffolds(scaffolds, filled, k, fuz, solid, derr, max_mem, randseed,
         upper, unique, best, reads, threads):
 
@@ -229,19 +228,19 @@ def fill_scaffolds(scaffolds, filled, k, fuz, solid, derr, max_mem, randseed,
         scaffolds = scaffolds.name
 
     binary_options = [option for option, on in [('-all-upper', upper), ('-unique', unique), ('-best-only', best)] if on]
-    with open('tmp.gap2seq.log', 'w') as f:
-        subprocess.check_call([GAP2SEQ,
-            '-k', str(k),
-            '-fuz', str(fuz),
-            '-solid', str(solid),
-            '-nb-cores', str(threads),
-            '-dist-error', str(derr),
-            '-max-mem', str(max_mem),
-            '-randseed', str(randseed),
-            '-reads', ','.join(reads),
-            '-filled', filled,
-            '-scaffolds', scaffolds] + binary_options,
-            stdout=f, stderr=f)
+    command = [GAP2SEQ,
+        '-k', str(k),
+        '-fuz', str(fuz),
+        '-solid', str(solid),
+        '-nb-cores', str(threads),
+        '-dist-error', str(derr),
+        '-max-mem', str(max_mem),
+        '-randseed', str(randseed),
+        '-reads', ','.join(reads),
+        '-filled', filled,
+        '-scaffolds', scaffolds] + binary_options
+    # print(' '.join(command))
+    subprocess.check_call(command)
 
 # NOTE: Assumes gaps and the bed file are in the same order
 def parse_gap(bed, gap, id, insertion=False):
@@ -299,26 +298,26 @@ def cut_gaps(k, fuz, mask, scaffolds, contigs_file = 'tmp.contigs',
     if bed_file != 'tmp.bed': check_file(bed_file)
 
     binary_options = [option for option, on in [('-mask', mask)] if on]
-    subprocess.check_call([GAPCUTTER,
-            '-k', str(k),
-            '-fuz', str(fuz),
-            '-scaffolds', scaffolds,
-            '-gaps', gap_file,
-            '-contigs', contigs_file,
-            '-bed', bed_file] + binary_options,
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    command = [GAPCUTTER,
+        '-k', str(k),
+        '-fuz', str(fuz),
+        '-scaffolds', scaffolds,
+        '-gaps', gap_file,
+        '-contigs', contigs_file,
+        '-bed', bed_file] + binary_options
+    # print(' '.join(command))
+    subprocess.check_call(command)
 
     return open(bed_file, 'r'), open(gap_file, 'r')
 
 # Run GapMerger, i.e. merge contigs and filled gaps back into scaffolds
 def merge_gaps(filled, merged, contigs_file='tmp.contigs'):
-    subprocess.check_call([GAPMERGER,
-            '-scaffolds', merged,
-            '-gaps', filled,
-            '-contigs', contigs_file],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-    # subprocess.check_call(['rm', '-f', contigs_file, filled])
+    command = [GAPMERGER,
+        '-scaffolds', merged,
+        '-gaps', filled,
+        '-contigs', contigs_file]
+    # print(' '.join(command))
+    subprocess.check_call(command)
 
 # Parse VCF file and extract kmers from reference genome
 def cut_vcf(vcf, reference_file, k, fuz, contigs_file = 'tmp.contigs',
@@ -504,4 +503,5 @@ if __name__ == '__main__':
         print('Merging filled gaps and contigs')
         merge_gaps(args['filled'], args['final_out'])
 
-    print('Filled %i out of %i gaps' % (successful_gaps, num_of_gaps))
+    if args['libraries'] != None:
+        print('Filled %i out of %i gaps' % (successful_gaps, num_of_gaps))
