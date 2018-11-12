@@ -62,9 +62,9 @@ add_executable("ReadFilter" src/ReadFilter.cpp)
 target_link_libraries("Gap2Seq-core" ${gatb-core-libraries})
 target_link_libraries("GapCutter" ${gatb-core-libraries})
 target_link_libraries("GapMerger" ${gatb-core-libraries})
-target_link_libraries("ReadFilter" ${gatb-core-libraries} ${htslib-library})
+target_link_libraries("ReadFilter" ${gatb-core-libraries} ${htslib-library} pthread bz2 lzma curl crypto)
 
-# set(CXX_WARNINGS -Wall -Wextra")
+# set(CXX_WARNINGS "-Wall -Wextra")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX_WARNINGS} -g")
 
 # copy the wrapper script
