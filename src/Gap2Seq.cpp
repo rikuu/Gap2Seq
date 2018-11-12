@@ -286,6 +286,7 @@ void Gap2Seq::execute()
   std::string scaffolds = getInput()->getStr(STR_SCAFFOLDS);
   BankFasta scaffoldBank(scaffolds);
   BankFasta::Iterator itSeq(scaffoldBank);
+  itSeq.first();
 
   // Count gaps and filled gaps
   int gapcount = 0;
@@ -308,6 +309,7 @@ void Gap2Seq::execute()
     while (more) {
       std::string seq = "";
       std::string comment = "";
+
       {
         LocalSynchronizer local(global_lock);
         if (!itSeq.isDone()) {
@@ -416,6 +418,7 @@ void Gap2Seq::execute()
           i++;
         }
       }
+
       // Add the end of the seq
       filledSeq = filledSeq + seq.substr(prevGapEnd, seq.length() - prevGapEnd);
 
@@ -533,6 +536,7 @@ public:
       if (s_f[mid].first < i) {
         lo = mid + 1;
       } else if (s_f[mid].first > i) {
+        if (mid == 0) return 0;
         hi = mid - 1;
       } else {
         return s_f[mid].second;
@@ -566,6 +570,7 @@ public:
       if (s_r[mid].first < i) {
         lo = mid + 1;
       } else if (s_r[mid].first > i) {
+        if (mid == 0) return 0;
         hi = mid - 1;
       } else {
         return s_r[mid].second;
@@ -706,6 +711,7 @@ public:
       if (s_f[mid] < i) {
         lo = mid + 1;
       } else if (s_f[mid] > i) {
+        if (mid == 0) return 0;
         hi = mid - 1;
       } else {
         return true;
@@ -739,6 +745,7 @@ public:
       if (s_r[mid] < i) {
         lo = mid + 1;
       } else if (s_r[mid] > i) {
+        if (mid == 0) return 0;
         hi = mid - 1;
       } else {
         return true;
