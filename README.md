@@ -30,7 +30,7 @@ and CMake version 3.1 or newer.
 ```sh
 git clone --recursive https://github.com/rikuu/Gap2Seq
 cd Gap2Seq
-cd thirdparty/htslib; make; cd ..
+cd thirdparty/htslib; make; cd ../..
 mkdir build;  cd build;  cmake ..;  make
 ```
 
