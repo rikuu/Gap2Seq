@@ -308,6 +308,12 @@ def cut_gaps(k, fuz, mask, scaffolds, contigs_file = 'tmp.contigs',
     # print(' '.join(command))
     subprocess.check_call(command)
 
+    if os.path.exists(gap_file):
+        print("Gaps identified, continuing")
+    else:
+        print("\033[93mNo gaps were generated. Check input, does scaffold have gaps?\033[0m")
+        sys.exit(1)
+      
     return open(bed_file, 'r'), open(gap_file, 'r')
 
 # Run GapMerger, i.e. merge contigs and filled gaps back into scaffolds
